@@ -1,0 +1,20 @@
+name: portaudio
+version: 0.0.1
+synopsis: Haskell bindings for the PortAudio library.
+description: Bindings to the cross platform PortAudio library. Version 0.0.1 excludes the callback model.
+category: Sound
+license: BSD3
+license-file: LICENSE
+author: John Van Enk
+maintainer: vanenkj@gmail.com
+copyright: (c) 2008 John Van Enk
+cabal-version: >= 1.2.0
+build-type: Simple
+
+library
+  hs-source-dirs: src
+  exposed-modules: Sound.PortAudio
+  other-modules: Sound.PortAudio.Base, Sound.PortAudio.Helpers, C2HS
+  ghc-options: -O2
+  build-depends: base > 3, mtl >= 1.1.0.0, haskell98
+  extra-Libraries: portaudio
