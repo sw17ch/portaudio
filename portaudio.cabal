@@ -3,7 +3,7 @@ version: 0.0.1
 synopsis: Haskell bindings for the PortAudio library.
 description: Bindings to the cross platform PortAudio library. Version 0.0.1 excludes the callback model.
 category: Sound
-license: BSD3
+license: OtherLicense
 license-file: LICENSE
 author: John Van Enk
 maintainer: vanenkj@gmail.com
