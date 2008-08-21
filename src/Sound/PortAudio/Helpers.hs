@@ -23,3 +23,9 @@ replicateWhileM mcond action = let f again = do c <- mcond
                                                 if c then liftM2 (:) action again
                                                      else return []
                                in fix f
+
+-- Pulled from Mat Morrow's lambdabot code parser
+untilM :: (a -> Bool) -> [a] -> Maybe a
+untilM _ [] = Nothing
+untilM p (x:xs) = if p x
+    then Just x else untilM p xs
