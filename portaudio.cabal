@@ -10,6 +10,8 @@ maintainer: vanenkj@gmail.com
 copyright: (c) 2008 John Van Enk
 cabal-version: >= 1.2.0
 build-type: Simple
+stability: experimental
+homepage: http://code.haskell.org/portaudio
 
 library
   hs-source-dirs: src
