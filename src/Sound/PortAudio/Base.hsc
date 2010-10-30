@@ -408,8 +408,7 @@ instance Storable PaHostApiInfo where
     peek p = do
         sv <- #{peek PaHostApiInfo, structVersion} p
         ty <- #{peek PaHostApiInfo, type} p
-        np <- return $ #{ptr  PaHostApiInfo, name} p :: IO CString
-        nm <- peekCString np
+        nm <- (peek $ #{ptr  PaHostApiInfo, name} p) >>= peekCString
         dc <- #{peek PaHostApiInfo, deviceCount} p
         di <- #{peek PaHostApiInfo, defaultInputDevice} p
         dd <- #{peek PaHostApiInfo, defaultOutputDevice} p
@@ -443,7 +442,7 @@ instance Storable PaDeviceInfo where
     alignment _ = #{const __alignof__(PaDeviceInfo)}
     peek p = do
         sv <- #{peek PaDeviceInfo, structVersion} p
-        nm <- peekCString $ #{ptr  PaDeviceInfo, name} p
+        nm <- (peek $ #{ptr  PaDeviceInfo, name} p) >>= peekCString
         ha <- #{peek PaDeviceInfo, hostApi} p
         mi <- #{peek PaDeviceInfo, maxInputChannels} p
         mo <- #{peek PaDeviceInfo, maxOutputChannels} p
