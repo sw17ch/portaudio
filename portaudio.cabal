@@ -17,5 +17,6 @@ library
   hs-source-dirs: src
   exposed-modules: Sound.PortAudio,
                    Sound.PortAudio.Base
+  ghc-options: -Wall
   build-depends: base > 4
   extra-Libraries: portaudio
