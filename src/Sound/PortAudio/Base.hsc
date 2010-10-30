@@ -41,40 +41,13 @@ data PaHostApiInfo = PaHostApiInfo {
     defaultOutputDevice :: PaDeviceIndex
 } deriving (Show)
 
-instance Storable PaHostApiInfo where
-    sizeOf _ = #{const sizeof(PaHostApiInfo)}
-    alignment _ = #{const __alignof__(PaHostApiInfo)}
-    peek p = do
-        sv <- #{peek PaHostApiInfo, structVersion} p
-        ty <- #{peek PaHostApiInfo, type} p
-        np <- return $ #{ptr  PaHostApiInfo, name} p :: IO CString
-        nm <- peekCString np
-        dc <- #{peek PaHostApiInfo, deviceCount} p
-        di <- #{peek PaHostApiInfo, defaultInputDevice} p
-        dd <- #{peek PaHostApiInfo, defaultOutputDevice} p
-        return $ PaHostApiInfo {
-            structVersion = sv,
-            hostapitype = ty,
-            name = nm,
-            deviceCount = dc,
-            defaultInputDevice = di,
-            defaultOutputDevice = dd
-        }
-    poke p v = error "Bad user! You shouldn't be poking PaHostApiInfo's!"
-        {- I dont believe we actually want to define this. It's bad.
-        #{poke PaHostApiInfo, structVersion}       p (structVersion v)
-        #{poke PaHostApiInfo, type}                p (hostapitype v)
-        #{poke PaHostApiInfo, name}                p (name v) -- Well this sucks.
-        #{poke PaHostApiInfo, deviceCount}         p (deviceCount v)
-        #{poke PaHostApiInfo, defaultInputDevice}  p (defaultInputDevice v)
-        #{poke PaHostApiInfo, defaultOutputDevice} p (defaultOutputDevice v)
-        return ()
-        }
-        -}
-
+data PaHostErrorInfo = PaHostErrorInfo {
+    hostApiType :: PaHostApiTypeId,
+    errorCode :: CLong,
+    errorText :: String
+} deriving (Show)
 
 {- Enumerable values -}
-
 #{enum PaErrorCode, PaErrorCode
     , paNoError = paNoError
     , paNotInitialized = paNotInitialized 
@@ -159,3 +132,51 @@ foreign import ccall "portaudio.h Pa_GetHostApiCount"
 {- PaHostApiIndex Pa_GetDefaultHostApi( void ); -}
 foreign import ccall "portaudio.h Pa_GetDefaultHostApi"
     pa_GetDefaultHostApi :: IO CInt
+
+{- const PaHostApiInfo * Pa_GetHostApiInfo( PaHostApiIndex hostApi ); -}
+foreign import ccall "portaudio.h Pa_GetHostApiInfo"
+    pa_GetHostApiInfo :: CInt -> IO (Ptr PaHostApiInfo)
+
+{- PaHostApiIndex Pa_HostApiTypeIdToHostApiIndex( PaHostApiTypeId type ); -}
+foreign import ccall "portaudio.h Pa_HostApiTypeIdToHostApiIndex"
+    pa_HostApiDeviceIdToHostApiIndex :: CInt -> CInt
+
+{- PaDeviceIndex Pa_HostApiDeviceIndexToDeviceIndex( PaHostApiIndex hostApi, int hostApiDeviceIndex ); -}
+foreign import ccall "portaudio.h Pa_HostApiDeviceIndexToDeviceIndex"
+    pa_HostApiDeviceIndexToDeviceIndex :: CInt -> CInt -> CInt
+
+{- Storable Instances for Structures -}
+instance Storable PaHostApiInfo where
+    sizeOf _ = #{const sizeof(PaHostApiInfo)}
+    alignment _ = #{const __alignof__(PaHostApiInfo)}
+    peek p = do
+        sv <- #{peek PaHostApiInfo, structVersion} p
+        ty <- #{peek PaHostApiInfo, type} p
+        np <- return $ #{ptr  PaHostApiInfo, name} p :: IO CString
+        nm <- peekCString np
+        dc <- #{peek PaHostApiInfo, deviceCount} p
+        di <- #{peek PaHostApiInfo, defaultInputDevice} p
+        dd <- #{peek PaHostApiInfo, defaultOutputDevice} p
+        return $ PaHostApiInfo {
+            structVersion = sv,
+            hostapitype = ty,
+            name = nm,
+            deviceCount = dc,
+            defaultInputDevice = di,
+            defaultOutputDevice = dd
+        }
+    poke p v = error "Bad user! You shouldn't be poking PaHostApiInfo's!"
+
+instance Storable PaHostErrorInfo where
+    sizeOf _ = #{const sizeof(PaHostErrorInfo)}
+    alignment _ = #{const __alignof__(PaHostErrorInfo)}
+    peek p = do
+        ha <- #{peek PaHostErrorInfo, hostApiType} p
+        ec <- #{peek PaHostErrorInfo, errorCode} p
+        ep <- return $ #{ptr PaHostErrorInfo, errorText} p
+        et <- peekCString ep
+        return $ PaHostErrorInfo {
+            hostApiType = ha,
+            errorCode = ec,
+            errorText = et
+        }
