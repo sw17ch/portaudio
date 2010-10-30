@@ -33,6 +33,9 @@ newtype PaHostApiTypeId = PaHostApiTypeId { unPaHostApiTypeId :: CInt }
 newtype PaSampleFormat = PaSampleFormat { unPaSampleFormat :: CUInt }
     deriving (Eq, Show, Storable)
 
+newtype PaStreamFlags = PaStreamFlags { unPaStreamFlags :: CULong }
+    deriving (Eq, Show, Storable)
+
 {- Other Types -}
 newtype PaTime = PaTime { unPaTime :: CDouble }
     deriving (Eq, Show, Storable)
@@ -64,6 +67,14 @@ data PaDeviceInfo = PaDeviceInfo {
     defaultHighInputLatency :: PaTime,
     defaultHighOutputLatency :: PaTime,
     defaultSampleRate :: CDouble
+} deriving (Show)
+
+data PaStreamParameters = PaStreamParameters {
+    device :: PaDeviceIndex,
+    channelCount :: CInt,
+    sampleFormat :: PaSampleFormat,
+    suggestedLatency :: PaTime,
+    hostApiSpecificStreamInfo :: Ptr ()
 } deriving (Show)
 
 {- Enumerable values -}
@@ -131,7 +142,23 @@ data PaDeviceInfo = PaDeviceInfo {
     , paUInt8 = paUInt8
     , paCustomFormat = paCustomFormat
     }
-                     
+
+#{enum PaStreamFlags, PaStreamFlags
+    , paNoFlag = paNoFlag
+    , paClipOff = paClipOff
+    , paDitherOff = paDitherOff
+    , paNeverDropInput = paNeverDropInput
+    , paPrimeOutputBuffersUsingStreamCallback = paPrimeOutputBuffersUsingStreamCallback
+    , paPlatformSpecificFlags = paPlatformSpecificFlags
+    }
+
+{- Other special static values. -}
+paFormatIsSupported :: PaError
+paFormatIsSupported = PaError $ PaErrorCode #{const paFormatIsSupported}
+
+paFramesPerBufferUnspecified :: CLong
+paFramesPerBufferUnspecified = #{const paFramesPerBufferUnspecified}
+
 {- FupaNonInterleavednctions -}
 
 {- int Pa_GetVersion( void ); -}
@@ -194,6 +221,14 @@ foreign import ccall "portaudio.h Pa_GetDefaultOutputDevice"
 foreign import ccall "portaudio.h Pa_GetDeviceInfo"
     pa_GetDeviceInfo :: IO (Ptr PaDeviceInfo)
 
+{- PaError Pa_IsFormatSupported( const PaStreamParameters *inputParameters,
+                                 const PaStreamParameters *outputParameters,
+                                 double sampleRate ); -}
+foreign import ccall "portaudio.h Pa_IsFormatSupported"
+    pa_IsFormatSupported :: Ptr PaStreamParameters
+                         -> Ptr PaStreamParameters
+                         -> IO CDouble
+
 {- Storable Instances for Structures -}
 instance Storable PaHostApiInfo where
     sizeOf _ = #{const sizeof(PaHostApiInfo)}
@@ -229,7 +264,7 @@ instance Storable PaHostErrorInfo where
             errorCode = ec,
             errorText = et
         }
-    poke _ _ = error "Bad user! You shouldn't be poking PaHostApiInfo's!"
+    poke _ _ = error "Bad user! You shouldn't be poking PaHostErrorInfo's!"
 
 instance Storable PaDeviceInfo where
     sizeOf _ = #{const sizeof(PaDeviceInfo)}
@@ -257,3 +292,28 @@ instance Storable PaDeviceInfo where
             defaultHighOutputLatency = ho,
             defaultSampleRate = ds
         }
+    poke _ _ = error "Bad user! You shouldn't be poking PaDeviceInfo's!"
+
+instance Storable PaStreamParameters where
+    sizeOf _ = #{const sizeof(PaStreamParameters)}
+    alignment _ = #{const __alignof__(PaStreamParameters)}
+    peek p = do
+        de <- #{peek PaStreamParameters, device} p
+        cc <- #{peek PaStreamParameters, channelCount} p
+        sf <- #{peek PaStreamParameters, sampleFormat} p
+        sl <- #{peek PaStreamParameters, suggestedLatency} p
+        si <- #{peek PaStreamParameters, hostApiSpecificStreamInfo} p
+        return $ PaStreamParameters {
+            device = de,
+            channelCount = cc,
+            sampleFormat = sf,
+            suggestedLatency = sl,
+            hostApiSpecificStreamInfo = si
+        }
+    poke p v = do
+        #{poke PaStreamParameters, device} p (device v)
+        #{poke PaStreamParameters, channelCount} p (channelCount v)
+        #{poke PaStreamParameters, sampleFormat} p (sampleFormat v)
+        #{poke PaStreamParameters, suggestedLatency} p (suggestedLatency v)
+        #{poke PaStreamParameters, hostApiSpecificStreamInfo} p (hostApiSpecificStreamInfo v)
+
