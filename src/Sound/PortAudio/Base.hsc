@@ -171,6 +171,7 @@ data PaStreamInfo = PaStreamInfo {
     , paInt8 = paInt8
     , paUInt8 = paUInt8
     , paCustomFormat = paCustomFormat
+    , paNonInterleaved = paNonInterleaved
     }
 
 #{enum PaStreamFlags, PaStreamFlags
@@ -203,7 +204,7 @@ paFormatIsSupported = PaError $ PaErrorCode #{const paFormatIsSupported}
 paFramesPerBufferUnspecified :: CLong
 paFramesPerBufferUnspecified = #{const paFramesPerBufferUnspecified}
 
-{- FupaNonInterleavednctions -}
+{- Functions -}
 
 {- int Pa_GetVersion( void ); -}
 foreign import ccall "portaudio.h Pa_GetVersion"
