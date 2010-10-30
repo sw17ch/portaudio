@@ -15,7 +15,6 @@ import Foreign.Ptr
 import Foreign.Storable
 
 {- Integral types. -}
-
 newtype PaErrorCode = PaErrorCode { unPaErrorCode :: CInt }
     deriving (Eq, Show, Storable)
 
@@ -31,11 +30,18 @@ newtype PaHostApiIndex = PaHostApiIndex { unPaHostApiIndex :: CInt }
 newtype PaHostApiTypeId = PaHostApiTypeId { unPaHostApiTypeId :: CInt }
     deriving (Eq, Show, Storable)
 
+newtype PaSampleFormat = PaSampleFormat { unPaSampleFormat :: CUInt }
+    deriving (Eq, Show, Storable)
+
+{- Other Types -}
+newtype PaTime = PaTime { unPaTime :: CDouble }
+    deriving (Eq, Show, Storable)
+
 {- Structures -}
 data PaHostApiInfo = PaHostApiInfo {
-    structVersion :: CInt,
+    structVersion_PaHostApiInfo :: CInt,
     hostapitype :: PaHostApiTypeId,
-    name :: String,
+    name_PaHostApiInfo :: String,
     deviceCount :: CInt,
     defaultInputDevice :: PaDeviceIndex,
     defaultOutputDevice :: PaDeviceIndex
@@ -45,6 +51,19 @@ data PaHostErrorInfo = PaHostErrorInfo {
     hostApiType :: PaHostApiTypeId,
     errorCode :: CLong,
     errorText :: String
+} deriving (Show)
+
+data PaDeviceInfo = PaDeviceInfo {
+    structVersion_PaDeviceInfo :: CInt,
+    name_PaDeviceInfo :: String,
+    hostApi :: PaHostApiIndex,
+    maxInputChannels :: CInt,
+    maxOutputChannels :: CInt,
+    defaultLowInputLatency :: PaTime,
+    defaultLowOutputLatency :: PaTime,
+    defaultHighInputLatency :: PaTime,
+    defaultHighOutputLatency :: PaTime,
+    defaultSampleRate :: CDouble
 } deriving (Show)
 
 {- Enumerable values -}
@@ -103,7 +122,17 @@ data PaHostErrorInfo = PaHostErrorInfo {
     , paAudioScienceHPI = paAudioScienceHPI 
     }
 
-{- Functions -}
+#{enum PaSampleFormat, PaSampleFormat
+    , paFloat32 = paFloat32
+    , paInt32 = paInt32
+    , paInt24 = paInt24
+    , paInt16 = paInt16
+    , paInt8 = paInt8
+    , paUInt8 = paUInt8
+    , paCustomFormat = paCustomFormat
+    }
+                     
+{- FupaNonInterleavednctions -}
 
 {- int Pa_GetVersion( void ); -}
 foreign import ccall "portaudio.h Pa_GetVersion"
@@ -139,11 +168,31 @@ foreign import ccall "portaudio.h Pa_GetHostApiInfo"
 
 {- PaHostApiIndex Pa_HostApiTypeIdToHostApiIndex( PaHostApiTypeId type ); -}
 foreign import ccall "portaudio.h Pa_HostApiTypeIdToHostApiIndex"
-    pa_HostApiDeviceIdToHostApiIndex :: CInt -> CInt
+    pa_HostApiTypeIdToHostApiIndex :: CInt -> CInt
 
 {- PaDeviceIndex Pa_HostApiDeviceIndexToDeviceIndex( PaHostApiIndex hostApi, int hostApiDeviceIndex ); -}
 foreign import ccall "portaudio.h Pa_HostApiDeviceIndexToDeviceIndex"
     pa_HostApiDeviceIndexToDeviceIndex :: CInt -> CInt -> CInt
+
+{- const PaHostErrorInfo* Pa_GetLastHostErrorInfo( void ); -}
+foreign import ccall "portaudio.h Pa_GetLastHostErrorInfo"
+    pa_GetLastHostErrorInfo :: IO (Ptr PaHostErrorInfo)
+
+{- PaDeviceIndex Pa_GetDeviceCount( void ); -}
+foreign import ccall "portaudio.h Pa_GetDeviceCount"
+    pa_GetDeviceCount :: IO CInt
+
+{- PaDeviceIndex Pa_GetDefaultInputDevice( void ); -}
+foreign import ccall "portaudio.h Pa_GetDefaultInputDevice"
+    pa_GetDefaultInputDevice :: IO CInt
+
+{- PaDeviceIndex Pa_GetDefaultOutputDevice( void ); -}
+foreign import ccall "portaudio.h Pa_GetDefaultOutputDevice"
+    pa_GetDefaultOutputDevice :: IO CInt
+
+{- const PaDeviceInfo* Pa_GetDeviceInfo( PaDeviceIndex device ); -}
+foreign import ccall "portaudio.h Pa_GetDeviceInfo"
+    pa_GetDeviceInfo :: IO (Ptr PaDeviceInfo)
 
 {- Storable Instances for Structures -}
 instance Storable PaHostApiInfo where
@@ -158,14 +207,14 @@ instance Storable PaHostApiInfo where
         di <- #{peek PaHostApiInfo, defaultInputDevice} p
         dd <- #{peek PaHostApiInfo, defaultOutputDevice} p
         return $ PaHostApiInfo {
-            structVersion = sv,
+            structVersion_PaHostApiInfo = sv,
             hostapitype = ty,
-            name = nm,
+            name_PaHostApiInfo = nm,
             deviceCount = dc,
             defaultInputDevice = di,
             defaultOutputDevice = dd
         }
-    poke p v = error "Bad user! You shouldn't be poking PaHostApiInfo's!"
+    poke _ _ = error "Bad user! You shouldn't be poking PaHostApiInfo's!"
 
 instance Storable PaHostErrorInfo where
     sizeOf _ = #{const sizeof(PaHostErrorInfo)}
@@ -179,4 +228,32 @@ instance Storable PaHostErrorInfo where
             hostApiType = ha,
             errorCode = ec,
             errorText = et
+        }
+    poke _ _ = error "Bad user! You shouldn't be poking PaHostApiInfo's!"
+
+instance Storable PaDeviceInfo where
+    sizeOf _ = #{const sizeof(PaDeviceInfo)}
+    alignment _ = #{const __alignof__(PaDeviceInfo)}
+    peek p = do
+        sv <- #{peek PaDeviceInfo, structVersion} p
+        nm <- peekCString $ #{ptr  PaDeviceInfo, name} p
+        ha <- #{peek PaDeviceInfo, hostApi} p
+        mi <- #{peek PaDeviceInfo, maxInputChannels} p
+        mo <- #{peek PaDeviceInfo, maxOutputChannels} p
+        li <- #{peek PaDeviceInfo, defaultLowInputLatency} p
+        lo <- #{peek PaDeviceInfo, defaultLowOutputLatency} p
+        hi <- #{peek PaDeviceInfo, defaultHighInputLatency} p
+        ho <- #{peek PaDeviceInfo, defaultHighOutputLatency} p
+        ds <- #{peek PaDeviceInfo, defaultSampleRate} p
+        return $ PaDeviceInfo {
+            structVersion_PaDeviceInfo = sv,
+            name_PaDeviceInfo = nm,
+            hostApi = ha,
+            maxInputChannels = mi,
+            maxOutputChannels = mo,
+            defaultLowInputLatency = li,
+            defaultLowOutputLatency = lo,
+            defaultHighInputLatency = hi,
+            defaultHighOutputLatency = ho,
+            defaultSampleRate = ds
         }
