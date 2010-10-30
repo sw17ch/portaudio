@@ -1,11 +1,5 @@
-{-# LANGUAGE ForeignFunctionInterface, GeneralizedNewtypeDeriving #-}
-module Sound.PortAudio.Base (
-    -- Functions
-    {-
-    Pa_GetVersion,
-    Pa_GetVersionText,
-    -}
-) where
+{-# LANGUAGE ForeignFunctionInterface, GeneralizedNewtypeDeriving, EmptyDataDecls #-}
+module Sound.PortAudio.Base where
 
 #include <portaudio.h>
 
@@ -36,9 +30,32 @@ newtype PaSampleFormat = PaSampleFormat { unPaSampleFormat :: CUInt }
 newtype PaStreamFlags = PaStreamFlags { unPaStreamFlags :: CULong }
     deriving (Eq, Show, Storable)
 
+newtype PaStreamCallbackFlags = PaStreamCallbackFlags { unPaStreamCallbackFlags :: CULong }
+    deriving (Eq, Show, Storable)
+
+newtype PaStreamCallbackResult = PaStreamCallbackResult { unPaStreamCallbackResult :: CInt }
+    deriving (Eq, Show, Storable)
+
+{- FunctionPtr Types -}
+type PaStreamCallback = FunPtr
+    (  Ptr () -- input
+    -> Ptr () -- output
+    -> CULong  -- frameCount
+    -> Ptr PaStreamCallbackTimeInfo -- timeInfo
+    -> PaStreamCallbackFlags -- statusFlags
+    -> Ptr () -- userData
+    -> CInt
+    )
+
+type PaStreamFinishedCallback = FunPtr
+    (  Ptr () -- userData
+    )  
+
 {- Other Types -}
 newtype PaTime = PaTime { unPaTime :: CDouble }
     deriving (Eq, Show, Storable)
+
+data PaStream
 
 {- Structures -}
 data PaHostApiInfo = PaHostApiInfo {
@@ -75,6 +92,19 @@ data PaStreamParameters = PaStreamParameters {
     sampleFormat :: PaSampleFormat,
     suggestedLatency :: PaTime,
     hostApiSpecificStreamInfo :: Ptr ()
+} deriving (Show)
+
+data PaStreamCallbackTimeInfo = PaStreamCallbackTimeInfo {
+    inputBufferAdcTime :: PaTime,
+    currentTime :: PaTime,
+    outputBufferDacTime :: PaTime
+} deriving (Show)
+
+data PaStreamInfo = PaStreamInfo {
+    structVersion_PaStreamInfo :: CInt,
+    inputLatency :: PaTime,
+    outputLatency :: PaTime,
+    sampleRate :: CDouble
 } deriving (Show)
 
 {- Enumerable values -}
@@ -150,6 +180,20 @@ data PaStreamParameters = PaStreamParameters {
     , paNeverDropInput = paNeverDropInput
     , paPrimeOutputBuffersUsingStreamCallback = paPrimeOutputBuffersUsingStreamCallback
     , paPlatformSpecificFlags = paPlatformSpecificFlags
+    }
+
+#{enum PaStreamCallbackFlags, PaStreamCallbackFlags
+    , paInputUnderflow = paInputUnderflow
+    , paInputOverflow = paInputOverflow
+    , paOutputUnderflow = paOutputUnderflow
+    , paOutputOverflow = paOutputOverflow
+    , paPrimingOutput = paPrimingOutput
+    }
+
+#{enum PaStreamCallbackResult, PaStreamCallbackResult
+    , paContinue = paContinue
+    , paComplete = paComplete
+    , paAbort = paAbort
     }
 
 {- Other special static values. -}
@@ -228,6 +272,133 @@ foreign import ccall "portaudio.h Pa_IsFormatSupported"
     pa_IsFormatSupported :: Ptr PaStreamParameters
                          -> Ptr PaStreamParameters
                          -> IO CDouble
+
+{- PaError Pa_OpenStream( PaStream** stream,
+                          const PaStreamParameters *inputParameters,
+                          const PaStreamParameters *outputParameters,
+                          double sampleRate,
+                          unsigned long framesPerBuffer,
+                          PaStreamFlags streamFlags,
+                          PaStreamCallback *streamCallback,
+                          void *userData ); -}
+foreign import ccall "portaudio.h Pa_OpenStream"
+    pa_OpenStream :: Ptr (Ptr PaStream)
+                  -> Ptr PaStreamParameters
+                  -> Ptr PaStreamParameters
+                  -> CDouble
+                  -> CULong
+                  -> PaStreamFlags
+                  -> PaStreamCallback
+                  -> Ptr ()
+                  -> IO CInt
+
+{- PaError Pa_OpenDefaultStream( PaStream** stream,
+                                 int numInputChannels,
+                                 int numOutputChannels,
+                                 PaSampleFormat sampleFormat,
+                                 double sampleRate,
+                                 unsigned long framesPerBuffer,
+                                 PaStreamCallback *streamCallback,
+                                 void *userData ); -}
+foreign import ccall "portaudio.h Pa_OpenDefaultStream"
+    pa_OpenDefaultStream :: Ptr (Ptr PaStream)
+                         -> CInt
+                         -> CInt
+                         -> PaSampleFormat
+                         -> CDouble
+                         -> CULong
+                         -> PaStreamCallback
+                         -> Ptr ()
+                         -> IO CInt
+
+{- PaError Pa_CloseStream( PaStream *stream ); -}
+foreign import ccall "portaudio.h Pa_CloseStream"
+    pa_CloseStream :: Ptr PaStream
+                   -> IO CInt
+
+{- PaError Pa_SetStreamFinishedCallback( PaStream *stream, PaStreamFinishedCallback* streamFinishedCallback );  -}
+foreign import ccall "portaudio.h Pa_SetStreamFinishedCallback"
+    pa_SetStreamFinishedCallback :: Ptr (Ptr PaStream)
+                                 -> PaStreamFinishedCallback
+                                 -> IO CInt
+
+{- PaError Pa_StartStream( PaStream *stream ); -}
+foreign import ccall "portaudio.h Pa_StartStream"
+    pa_StartStream :: Ptr PaStream
+                   -> IO CInt
+
+{- PaError Pa_StopStream( PaStream *stream ); -}
+foreign import ccall "portaudio.h Pa_StopStream"
+    pa_StopStream :: Ptr PaStream
+                  -> IO CInt
+
+{- PaError Pa_AbortStream( PaStream *stream ); -}
+foreign import ccall "portaudio.h Pa_AbortStream"
+    pa_AbortStream :: Ptr PaStream
+                   -> IO CInt
+
+{- PaError Pa_IsStreamStopped( PaStream *stream ); -}
+foreign import ccall "portaudio.h Pa_IsStreamStopped"
+    pa_IsStreamStopped :: Ptr PaStream
+                       -> IO CInt
+
+{- PaError Pa_IsStreamActive( PaStream *stream ); -}
+foreign import ccall "portaudio.h Pa_IsStreamActive"
+    pa_IsStreamActive :: Ptr PaStream
+                       -> IO CInt
+
+{- const PaStreamInfo* Pa_GetStreamInfo( PaStream *stream ); -}
+foreign import ccall "portaudio.h Pa_GetStreamInfo"
+    pa_GetStreamInfo :: Ptr PaStream
+                     -> IO (Ptr PaStreamInfo)
+
+{- PaTime Pa_GetStreamTime( PaStream *stream ); -}
+foreign import ccall "portaudio.h Pa_GetStreamTime"
+    pa_GetStreamTime :: Ptr PaStream
+                     -> IO PaTime
+
+{- double Pa_GetStreamCpuLoad( PaStream* stream ); -}
+foreign import ccall "portaudio.h Pa_GetStreamCpuLoad"
+    pa_GetStreamCpuLoad :: Ptr PaStream
+                        -> IO CDouble
+
+{- PaError Pa_ReadStream( PaStream* stream,
+                          void *buffer,
+                          unsigned long frames ); -}
+foreign import ccall "portaudio.h Pa_ReadStream"
+    pa_ReadStream :: Ptr PaStream
+                  -> Ptr ()
+                  -> CULong
+                  -> IO CInt
+
+{- PaError Pa_WriteStream( PaStream* stream,
+                           const void *buffer,
+                           unsigned long frames ); -}
+foreign import ccall "portaudio.h Pa_WriteStream"
+    pa_WriteStream :: Ptr PaStream
+                   -> Ptr ()
+                   -> CULong
+                   -> IO CInt
+
+{- signed long Pa_GetStreamReadAvailable( PaStream* stream ); -}
+foreign import ccall "portaudio.h Pa_GetStreamReadAvailable"
+    pa_GetStreamReadAvailable :: Ptr PaStream
+                              -> IO CLong
+
+{- signed long Pa_GetStreamWriteAvailable( PaStream* stream ); -}
+foreign import ccall "portaudio.h Pa_GetStreamWriteAvailable"
+    pa_GetStreamWriteAvailable :: Ptr PaStream
+                               -> IO CLong
+
+{- PaError Pa_GetSampleSize( PaSampleFormat format ); -}
+foreign import ccall "portaudio.h Pa_GetSampleSize"
+    pa_GetSampleSize :: PaSampleFormat
+                     -> IO CInt
+
+{- void Pa_Sleep( long msec ); -}
+foreign import ccall "portaudio.h Pa_Sleep"
+    pa_Sleep :: CLong
+             -> IO ()
 
 {- Storable Instances for Structures -}
 instance Storable PaHostApiInfo where
@@ -316,4 +487,41 @@ instance Storable PaStreamParameters where
         #{poke PaStreamParameters, sampleFormat} p (sampleFormat v)
         #{poke PaStreamParameters, suggestedLatency} p (suggestedLatency v)
         #{poke PaStreamParameters, hostApiSpecificStreamInfo} p (hostApiSpecificStreamInfo v)
+
+instance Storable PaStreamCallbackTimeInfo where
+    sizeOf _ = #{const sizeof(PaStreamCallbackTimeInfo)}
+    alignment _ = #{const __alignof__(PaStreamCallbackTimeInfo)}
+    peek p = do
+        at <- #{peek PaStreamCallbackTimeInfo, inputBufferAdcTime} p
+        ct <- #{peek PaStreamCallbackTimeInfo, currentTime} p
+        dt <- #{peek PaStreamCallbackTimeInfo, outputBufferDacTime} p
+        return $ PaStreamCallbackTimeInfo {
+            inputBufferAdcTime = at,
+            currentTime = ct,
+            outputBufferDacTime = dt
+        }
+    poke p v = do -- not sure if this should be allowed.
+        #{poke PaStreamCallbackTimeInfo, inputBufferAdcTime} p (inputBufferAdcTime v)
+        #{poke PaStreamCallbackTimeInfo, currentTime} p (currentTime v)
+        #{poke PaStreamCallbackTimeInfo, outputBufferDacTime} p (outputBufferDacTime v)
+
+instance Storable PaStreamInfo where
+    sizeOf _ = #{const sizeof(PaStreamInfo)}
+    alignment _ = #{const __alignof__(PaStreamInfo)}
+    peek p = do
+        sv <- #{peek PaStreamInfo, structVersion} p
+        il <- #{peek PaStreamInfo, inputLatency} p
+        ol <- #{peek PaStreamInfo, outputLatency} p
+        sl <- #{peek PaStreamInfo, sampleRate} p
+        return $ PaStreamInfo {
+            structVersion_PaStreamInfo = sv,
+            inputLatency = il,
+            outputLatency = ol,
+            sampleRate = sl
+        }
+    poke p v = do -- not sure if this should be allowed.
+        #{poke PaStreamInfo, structVersion} p (structVersion_PaStreamInfo v)
+        #{poke PaStreamInfo, inputLatency} p (inputLatency v)
+        #{poke PaStreamInfo, outputLatency} p (outputLatency v)
+        #{poke PaStreamInfo, sampleRate} p (sampleRate v)
 
