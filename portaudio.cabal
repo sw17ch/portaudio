@@ -16,7 +16,6 @@ homepage: http://code.haskell.org/portaudio
 library
   hs-source-dirs: src
   exposed-modules: Sound.PortAudio
-  other-modules: Sound.PortAudio.Base, Sound.PortAudio.Helpers, C2HS
-  ghc-options: -O2
-  build-depends: base > 3, mtl >= 1.1.0.0, haskell98
+  other-modules: Sound.PortAudio.Base
+  build-depends: base > 4
   extra-Libraries: portaudio
