@@ -37,19 +37,21 @@ newtype PaStreamCallbackResult = PaStreamCallbackResult { unPaStreamCallbackResu
     deriving (Eq, Show, Storable)
 
 {- FunctionPtr Types -}
-type PaStreamCallback = FunPtr
+type PaStreamCallback =
     (  Ptr () -- input
     -> Ptr () -- output
     -> CULong  -- frameCount
     -> Ptr PaStreamCallbackTimeInfo -- timeInfo
-    -> PaStreamCallbackFlags -- statusFlags
+    -> CInt -- statusFlags
     -> Ptr () -- userData
     -> CInt
     )
+type PaStreamCallbackFunPtr = FunPtr PaStreamCallback
 
-type PaStreamFinishedCallback = FunPtr
+type PaStreamFinishedCallback =
     (  Ptr () -- userData
     )  
+type PaStreamFinishedCallbackFunPtr = FunPtr PaStreamFinishedCallback
 
 {- Other Types -}
 newtype PaTime = PaTime { unPaTime :: CDouble }
@@ -289,7 +291,7 @@ foreign import ccall "portaudio.h Pa_OpenStream"
                   -> CDouble
                   -> CULong
                   -> PaStreamFlags
-                  -> PaStreamCallback
+                  -> PaStreamCallbackFunPtr
                   -> Ptr ()
                   -> IO CInt
 
@@ -308,7 +310,7 @@ foreign import ccall "portaudio.h Pa_OpenDefaultStream"
                          -> PaSampleFormat
                          -> CDouble
                          -> CULong
-                         -> PaStreamCallback
+                         -> PaStreamCallbackFunPtr
                          -> Ptr ()
                          -> IO CInt
 
@@ -525,3 +527,10 @@ instance Storable PaStreamInfo where
         #{poke PaStreamInfo, outputLatency} p (outputLatency v)
         #{poke PaStreamInfo, sampleRate} p (sampleRate v)
 
+
+{- Callback Wrappers -}
+foreign import ccall safe "wrapper"
+    wrap_PaStreamFinishedCallback :: PaStreamFinishedCallback -> IO PaStreamFinishedCallbackFunPtr
+foreign import ccall safe "wrapper"
+    wrap_PaStreamCallback :: PaStreamCallback -> IO PaStreamCallbackFunPtr
+     
