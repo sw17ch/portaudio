@@ -209,69 +209,69 @@ paFramesPerBufferUnspecified = #{const paFramesPerBufferUnspecified}
 {- Functions -}
 
 {- int Pa_GetVersion( void ); -}
-foreign import ccall "portaudio.h Pa_GetVersion"
+foreign import ccall unsafe "portaudio.h Pa_GetVersion"
     pa_GetVersion :: IO CInt
 
 {- const char * Pa_GetVersionText( void ); -}
-foreign import ccall "portaudio.h Pa_GetVersionText"
+foreign import ccall unsafe "portaudio.h Pa_GetVersionText"
     pa_GetVersionText :: IO CString
 
 {- const char * Pa_GetErrorText( PaError errorCode ); -}
-foreign import ccall "portaudio.h Pa_GetErrorText"
+foreign import ccall unsafe "portaudio.h Pa_GetErrorText"
     pa_GetErrorText :: CInt -> IO CString 
 
 {- PaError Pa_Initialize( void ); -}
-foreign import ccall "portaudio.h Pa_Initialize"
+foreign import ccall unsafe "portaudio.h Pa_Initialize"
     pa_Initialize :: IO CInt
 
 {- PaError Pa_Terminate( void ); -}
-foreign import ccall "portaudio.h Pa_Terminate"
+foreign import ccall unsafe "portaudio.h Pa_Terminate"
     pa_Terminate :: IO CInt
 
 {- PaHostApiIndex Pa_GetHostApiCount( void ); -}
-foreign import ccall "portaudio.h Pa_GetHostApiCount"
+foreign import ccall unsafe "portaudio.h Pa_GetHostApiCount"
     pa_GetHostApiCount :: IO CInt
 
 {- PaHostApiIndex Pa_GetDefaultHostApi( void ); -}
-foreign import ccall "portaudio.h Pa_GetDefaultHostApi"
+foreign import ccall unsafe "portaudio.h Pa_GetDefaultHostApi"
     pa_GetDefaultHostApi :: IO CInt
 
 {- const PaHostApiInfo * Pa_GetHostApiInfo( PaHostApiIndex hostApi ); -}
-foreign import ccall "portaudio.h Pa_GetHostApiInfo"
+foreign import ccall unsafe "portaudio.h Pa_GetHostApiInfo"
     pa_GetHostApiInfo :: CInt -> IO (Ptr PaHostApiInfo)
 
 {- PaHostApiIndex Pa_HostApiTypeIdToHostApiIndex( PaHostApiTypeId type ); -}
-foreign import ccall "portaudio.h Pa_HostApiTypeIdToHostApiIndex"
+foreign import ccall unsafe "portaudio.h Pa_HostApiTypeIdToHostApiIndex"
     pa_HostApiTypeIdToHostApiIndex :: CInt -> CInt
 
 {- PaDeviceIndex Pa_HostApiDeviceIndexToDeviceIndex( PaHostApiIndex hostApi, int hostApiDeviceIndex ); -}
-foreign import ccall "portaudio.h Pa_HostApiDeviceIndexToDeviceIndex"
+foreign import ccall unsafe "portaudio.h Pa_HostApiDeviceIndexToDeviceIndex"
     pa_HostApiDeviceIndexToDeviceIndex :: CInt -> CInt -> CInt
 
 {- const PaHostErrorInfo* Pa_GetLastHostErrorInfo( void ); -}
-foreign import ccall "portaudio.h Pa_GetLastHostErrorInfo"
+foreign import ccall unsafe "portaudio.h Pa_GetLastHostErrorInfo"
     pa_GetLastHostErrorInfo :: IO (Ptr PaHostErrorInfo)
 
 {- PaDeviceIndex Pa_GetDeviceCount( void ); -}
-foreign import ccall "portaudio.h Pa_GetDeviceCount"
+foreign import ccall unsafe "portaudio.h Pa_GetDeviceCount"
     pa_GetDeviceCount :: IO CInt
 
 {- PaDeviceIndex Pa_GetDefaultInputDevice( void ); -}
-foreign import ccall "portaudio.h Pa_GetDefaultInputDevice"
+foreign import ccall unsafe "portaudio.h Pa_GetDefaultInputDevice"
     pa_GetDefaultInputDevice :: IO CInt
 
 {- PaDeviceIndex Pa_GetDefaultOutputDevice( void ); -}
-foreign import ccall "portaudio.h Pa_GetDefaultOutputDevice"
+foreign import ccall unsafe "portaudio.h Pa_GetDefaultOutputDevice"
     pa_GetDefaultOutputDevice :: IO CInt
 
 {- const PaDeviceInfo* Pa_GetDeviceInfo( PaDeviceIndex device ); -}
-foreign import ccall "portaudio.h Pa_GetDeviceInfo"
+foreign import ccall unsafe "portaudio.h Pa_GetDeviceInfo"
     pa_GetDeviceInfo :: IO (Ptr PaDeviceInfo)
 
 {- PaError Pa_IsFormatSupported( const PaStreamParameters *inputParameters,
                                  const PaStreamParameters *outputParameters,
                                  double sampleRate ); -}
-foreign import ccall "portaudio.h Pa_IsFormatSupported"
+foreign import ccall unsafe "portaudio.h Pa_IsFormatSupported"
     pa_IsFormatSupported :: Ptr PaStreamParameters
                          -> Ptr PaStreamParameters
                          -> IO CDouble
@@ -284,7 +284,7 @@ foreign import ccall "portaudio.h Pa_IsFormatSupported"
                           PaStreamFlags streamFlags,
                           PaStreamCallback *streamCallback,
                           void *userData ); -}
-foreign import ccall "portaudio.h Pa_OpenStream"
+foreign import ccall safe "portaudio.h Pa_OpenStream"
     pa_OpenStream :: Ptr (Ptr PaStream)
                   -> Ptr PaStreamParameters
                   -> Ptr PaStreamParameters
@@ -303,7 +303,7 @@ foreign import ccall "portaudio.h Pa_OpenStream"
                                  unsigned long framesPerBuffer,
                                  PaStreamCallback *streamCallback,
                                  void *userData ); -}
-foreign import ccall "portaudio.h Pa_OpenDefaultStream"
+foreign import ccall safe "portaudio.h Pa_OpenDefaultStream"
     pa_OpenDefaultStream :: Ptr (Ptr PaStream)
                          -> CInt
                          -> CInt
@@ -315,60 +315,60 @@ foreign import ccall "portaudio.h Pa_OpenDefaultStream"
                          -> IO CInt
 
 {- PaError Pa_CloseStream( PaStream *stream ); -}
-foreign import ccall "portaudio.h Pa_CloseStream"
+foreign import ccall unsafe "portaudio.h Pa_CloseStream"
     pa_CloseStream :: Ptr PaStream
                    -> IO CInt
 
 {- PaError Pa_SetStreamFinishedCallback( PaStream *stream, PaStreamFinishedCallback* streamFinishedCallback );  -}
-foreign import ccall "portaudio.h Pa_SetStreamFinishedCallback"
+foreign import ccall safe "portaudio.h Pa_SetStreamFinishedCallback"
     pa_SetStreamFinishedCallback :: Ptr (Ptr PaStream)
                                  -> PaStreamFinishedCallback
                                  -> IO CInt
 
 {- PaError Pa_StartStream( PaStream *stream ); -}
-foreign import ccall "portaudio.h Pa_StartStream"
+foreign import ccall safe "portaudio.h Pa_StartStream"
     pa_StartStream :: Ptr PaStream
                    -> IO CInt
 
 {- PaError Pa_StopStream( PaStream *stream ); -}
-foreign import ccall "portaudio.h Pa_StopStream"
+foreign import ccall safe "portaudio.h Pa_StopStream"
     pa_StopStream :: Ptr PaStream
                   -> IO CInt
 
 {- PaError Pa_AbortStream( PaStream *stream ); -}
-foreign import ccall "portaudio.h Pa_AbortStream"
+foreign import ccall safe "portaudio.h Pa_AbortStream"
     pa_AbortStream :: Ptr PaStream
                    -> IO CInt
 
 {- PaError Pa_IsStreamStopped( PaStream *stream ); -}
-foreign import ccall "portaudio.h Pa_IsStreamStopped"
+foreign import ccall unsafe "portaudio.h Pa_IsStreamStopped"
     pa_IsStreamStopped :: Ptr PaStream
                        -> IO CInt
 
 {- PaError Pa_IsStreamActive( PaStream *stream ); -}
-foreign import ccall "portaudio.h Pa_IsStreamActive"
+foreign import ccall unsafe "portaudio.h Pa_IsStreamActive"
     pa_IsStreamActive :: Ptr PaStream
                        -> IO CInt
 
 {- const PaStreamInfo* Pa_GetStreamInfo( PaStream *stream ); -}
-foreign import ccall "portaudio.h Pa_GetStreamInfo"
+foreign import ccall unsafe "portaudio.h Pa_GetStreamInfo"
     pa_GetStreamInfo :: Ptr PaStream
                      -> IO (Ptr PaStreamInfo)
 
 {- PaTime Pa_GetStreamTime( PaStream *stream ); -}
-foreign import ccall "portaudio.h Pa_GetStreamTime"
+foreign import ccall unsafe "portaudio.h Pa_GetStreamTime"
     pa_GetStreamTime :: Ptr PaStream
                      -> IO PaTime
 
 {- double Pa_GetStreamCpuLoad( PaStream* stream ); -}
-foreign import ccall "portaudio.h Pa_GetStreamCpuLoad"
+foreign import ccall unsafe "portaudio.h Pa_GetStreamCpuLoad"
     pa_GetStreamCpuLoad :: Ptr PaStream
                         -> IO CDouble
 
 {- PaError Pa_ReadStream( PaStream* stream,
                           void *buffer,
                           unsigned long frames ); -}
-foreign import ccall "portaudio.h Pa_ReadStream"
+foreign import ccall unsafe "portaudio.h Pa_ReadStream"
     pa_ReadStream :: Ptr PaStream
                   -> Ptr ()
                   -> CULong
@@ -377,29 +377,29 @@ foreign import ccall "portaudio.h Pa_ReadStream"
 {- PaError Pa_WriteStream( PaStream* stream,
                            const void *buffer,
                            unsigned long frames ); -}
-foreign import ccall "portaudio.h Pa_WriteStream"
+foreign import ccall unsafe "portaudio.h Pa_WriteStream"
     pa_WriteStream :: Ptr PaStream
                    -> Ptr ()
                    -> CULong
                    -> IO CInt
 
 {- signed long Pa_GetStreamReadAvailable( PaStream* stream ); -}
-foreign import ccall "portaudio.h Pa_GetStreamReadAvailable"
+foreign import ccall unsafe "portaudio.h Pa_GetStreamReadAvailable"
     pa_GetStreamReadAvailable :: Ptr PaStream
                               -> IO CLong
 
 {- signed long Pa_GetStreamWriteAvailable( PaStream* stream ); -}
-foreign import ccall "portaudio.h Pa_GetStreamWriteAvailable"
+foreign import ccall unsafe "portaudio.h Pa_GetStreamWriteAvailable"
     pa_GetStreamWriteAvailable :: Ptr PaStream
                                -> IO CLong
 
 {- PaError Pa_GetSampleSize( PaSampleFormat format ); -}
-foreign import ccall "portaudio.h Pa_GetSampleSize"
+foreign import ccall unsafe "portaudio.h Pa_GetSampleSize"
     pa_GetSampleSize :: PaSampleFormat
                      -> IO CInt
 
 {- void Pa_Sleep( long msec ); -}
-foreign import ccall "portaudio.h Pa_Sleep"
+foreign import ccall unsafe "portaudio.h Pa_Sleep"
     pa_Sleep :: CLong
              -> IO ()
 
@@ -533,4 +533,3 @@ foreign import ccall safe "wrapper"
     wrap_PaStreamFinishedCallback :: PaStreamFinishedCallback -> IO PaStreamFinishedCallbackFunPtr
 foreign import ccall safe "wrapper"
     wrap_PaStreamCallback :: PaStreamCallback -> IO PaStreamCallbackFunPtr
-     
