@@ -12,9 +12,6 @@ import Foreign.Storable
 newtype PaErrorCode = PaErrorCode { unPaErrorCode :: CInt }
     deriving (Eq, Show, Storable)
 
-newtype PaError = PaError { unPaError :: PaErrorCode }
-    deriving (Eq, Show, Storable)
-
 newtype PaDeviceIndex = PaDeviceIndex { unPaDeviceIndex :: CInt }
     deriving (Eq, Show, Storable)
 
@@ -200,8 +197,8 @@ data PaStreamInfo = PaStreamInfo {
     }
 
 {- Other special static values. -}
-paFormatIsSupported :: PaError
-paFormatIsSupported = PaError $ PaErrorCode #{const paFormatIsSupported}
+paFormatIsSupported :: PaErrorCode
+paFormatIsSupported = PaErrorCode #{const paFormatIsSupported}
 
 paFramesPerBufferUnspecified :: CLong
 paFramesPerBufferUnspecified = #{const paFramesPerBufferUnspecified}
