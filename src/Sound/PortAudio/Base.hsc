@@ -318,7 +318,7 @@ foreign import ccall unsafe "portaudio.h Pa_CloseStream"
 
 {- PaError Pa_SetStreamFinishedCallback( PaStream *stream, PaStreamFinishedCallback* streamFinishedCallback );  -}
 foreign import ccall safe "portaudio.h Pa_SetStreamFinishedCallback"
-    pa_SetStreamFinishedCallback :: Ptr (Ptr PaStream)
+    pa_SetStreamFinishedCallback :: Ptr PaStream
                                  -> PaStreamFinishedCallback
                                  -> IO CInt
 
