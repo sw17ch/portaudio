@@ -41,7 +41,7 @@ type PaStreamCallback =
     -> Ptr PaStreamCallbackTimeInfo -- timeInfo
     -> CInt -- statusFlags
     -> Ptr () -- userData
-    -> CInt
+    -> IO CInt
     )
 type PaStreamCallbackFunPtr = FunPtr PaStreamCallback
 
