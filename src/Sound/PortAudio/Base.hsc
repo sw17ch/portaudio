@@ -200,7 +200,7 @@ data PaStreamInfo = PaStreamInfo {
 paFormatIsSupported :: PaErrorCode
 paFormatIsSupported = PaErrorCode #{const paFormatIsSupported}
 
-paFramesPerBufferUnspecified :: CLong
+paFramesPerBufferUnspecified :: CULong
 paFramesPerBufferUnspecified = #{const paFramesPerBufferUnspecified}
 
 {- Functions -}
