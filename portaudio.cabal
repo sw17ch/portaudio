@@ -18,5 +18,6 @@ library
   exposed-modules: Sound.PortAudio,
                    Sound.PortAudio.Base
   ghc-options: -Wall
-  build-depends: base > 4
+  build-depends: base > 4,
+                 containers == 0.3.*
   extra-Libraries: portaudio
