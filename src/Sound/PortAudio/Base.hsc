@@ -46,8 +46,9 @@ type PaStreamCallback =
 type PaStreamCallbackFunPtr = FunPtr PaStreamCallback
 
 type PaStreamFinishedCallback =
-    (  Ptr () -- userData
+    (  Ptr () -> IO ()
     )  
+
 type PaStreamFinishedCallbackFunPtr = FunPtr PaStreamFinishedCallback
 
 {- Other Types -}
@@ -140,11 +141,6 @@ data PaStreamInfo = PaStreamInfo {
     , paBadBufferPtr = paBadBufferPtr 
     }
 
-#{enum PaDeviceIndex, PaDeviceIndex
-    , paNoDevice = paNoDevice
-    , paUseHostApiSpecificDeviceSpecification = paUseHostApiSpecificDeviceSpecification
-    }
-
 #{enum PaHostApiTypeId, PaHostApiTypeId
     , paInDevelopment = paInDevelopment 
     , paDirectSound = paDirectSound 
@@ -160,6 +156,11 @@ data PaStreamInfo = PaStreamInfo {
     , paJACK = paJACK 
     , paWASAPI = paWASAPI 
     , paAudioScienceHPI = paAudioScienceHPI 
+    }
+
+#{enum PaDeviceIndex, PaDeviceIndex
+    , paNoDevice = paNoDevice
+    , paUseHostApiSpecificDeviceSpecification = paUseHostApiSpecificDeviceSpecification
     }
 
 #{enum PaSampleFormat, PaSampleFormat
@@ -195,6 +196,8 @@ data PaStreamInfo = PaStreamInfo {
     , paComplete = paComplete
     , paAbort = paAbort
     }
+
+
 
 {- Other special static values. -}
 paFormatIsSupported :: PaErrorCode
@@ -263,7 +266,7 @@ foreign import ccall unsafe "portaudio.h Pa_GetDefaultOutputDevice"
 
 {- const PaDeviceInfo* Pa_GetDeviceInfo( PaDeviceIndex device ); -}
 foreign import ccall unsafe "portaudio.h Pa_GetDeviceInfo"
-    pa_GetDeviceInfo :: IO (Ptr PaDeviceInfo)
+    pa_GetDeviceInfo :: CInt -> IO (Ptr PaDeviceInfo)
 
 {- PaError Pa_IsFormatSupported( const PaStreamParameters *inputParameters,
                                  const PaStreamParameters *outputParameters,
@@ -319,7 +322,7 @@ foreign import ccall unsafe "portaudio.h Pa_CloseStream"
 {- PaError Pa_SetStreamFinishedCallback( PaStream *stream, PaStreamFinishedCallback* streamFinishedCallback );  -}
 foreign import ccall safe "portaudio.h Pa_SetStreamFinishedCallback"
     pa_SetStreamFinishedCallback :: Ptr PaStream
-                                 -> PaStreamFinishedCallback
+                                 -> PaStreamFinishedCallbackFunPtr
                                  -> IO CInt
 
 {- PaError Pa_StartStream( PaStream *stream ); -}
