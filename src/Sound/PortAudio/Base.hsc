@@ -21,7 +21,7 @@ newtype PaHostApiIndex = PaHostApiIndex { unPaHostApiIndex :: CInt }
 newtype PaHostApiTypeId = PaHostApiTypeId { unPaHostApiTypeId :: CInt }
     deriving (Eq, Show, Storable)
 
-newtype PaSampleFormat = PaSampleFormat { unPaSampleFormat :: CUInt }
+newtype PaSampleFormat = PaSampleFormat { unPaSampleFormat :: CULong }
     deriving (Eq, Show, Storable)
 
 newtype PaStreamFlags = PaStreamFlags { unPaStreamFlags :: CULong }
