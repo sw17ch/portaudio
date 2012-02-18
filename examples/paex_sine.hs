@@ -12,9 +12,6 @@ import Text.Printf
 import Foreign.C.Types
 import Foreign.Storable
 
-import System.IO.Unsafe
-import Data.IORef
-
 numSeconds :: Int
 numSeconds = 5
 
