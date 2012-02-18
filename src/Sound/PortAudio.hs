@@ -22,7 +22,7 @@ import Data.Map (Map)
 import qualified Data.Map as Map
 import Data.Maybe (fromJust, fromMaybe, isJust)
 import Foreign.C.Types (CDouble, CInt, CFloat, CULong)
-import Foreign.Marshal.Alloc (alloca, free)
+import Foreign.Marshal.Alloc (alloca)
 import Foreign.Ptr (Ptr, castPtr, nullFunPtr, nullPtr, freeHaskellFunPtr)
 import Foreign.Storable (Storable, peek, poke)
 import qualified Sound.PortAudio.Base as Base
@@ -389,7 +389,6 @@ getDeviceInfo x = do
         then return (Left DeviceUnavailable)
         else do
             devStruct <- peek devInfo
---           free devInfo
             return (Right devStruct)
 
 -- If we don't care about user data, just use this
