@@ -3,10 +3,11 @@ module Sound.PortAudio
     ( Error(..), errorValuesByCode, errorCodesByValue
     , initialize, terminate, withPortAudio
     , StreamCallback, StreamResult(..)
-    , StreamFormat
+    , StreamFormat, StreamOpenFlag(..)
     , StreamParameters(..)
     , Stream, openStream, withStream, openDefaultStream, withDefaultStream, abortStream, closeStream
-    , startStream, stopStream, withStreamRunning ) where
+    , startStream, stopStream, withStreamRunning
+    , addStreamFin, withDefaultOutputInfo, withDefaultInputInfo, makeFinishedCallback ) where
 
 import Control.Applicative ((<$>))
 import Control.Arrow (first, second, (|||))
@@ -117,6 +118,7 @@ initialize = maybeError <$> Base.pa_Initialize
 terminate :: IO (Maybe Error)
 terminate = maybeError <$> Base.pa_Terminate
 
+
 -- | Evaluate a function with PortAudio initialized, terminating it after evaluation
 withPortAudio
     :: IO (Either Error a) -- ^ Computation to apply while PortAudio is initialized
@@ -171,7 +173,6 @@ type StreamCallback input output =
    -> Ptr output                    -- ^ where to write output samples
    -> IO StreamResult               -- ^ What to do with the stream, plus the output to stream
 
- 
 
 -- | Result from stream callbacks that determines the action to take regarding the stream
 data StreamResult
@@ -336,6 +337,64 @@ withDefaultStream numInputs numOutputs sampleRate framesPerBuffer callback =
     bracket open close . (return . Left |||)
         where open = openDefaultStream numInputs numOutputs sampleRate framesPerBuffer callback
               close = const (return Nothing) ||| closeStream
+
+
+
+-- Not sure if these can be replaced in place of the above with Methods.
+-- I think they could still be useful for finer grained control. I'll try to 
+-- write examples where we can't use the above methods in order to demonstrate.
+
+addStreamFin :: Base.PaStreamFinishedCallback -> Stream -> IO (Maybe Error)
+addStreamFin callback strm = do
+    wrapped <- Base.wrap_PaStreamFinishedCallback callback
+    maybeError <$> Base.pa_SetStreamFinishedCallback (underlyingStream strm) wrapped
+
+getDefaultOut :: IO (Either Error Base.PaDeviceIndex)
+getDefaultOut = do
+    out <- Base.PaDeviceIndex <$> Base.pa_GetDefaultOutputDevice
+    return $ if out /= Base.paNoDevice then (Right out) else (Left DeviceUnavailable)
+
+getDefaultIn :: IO (Either Error Base.PaDeviceIndex)
+getDefaultIn = do
+    in_ <- Base.PaDeviceIndex <$> Base.pa_GetDefaultInputDevice
+    return $ if in_ /= Base.paNoDevice then (Right in_) else (Left DeviceUnavailable)
+
+--prolly can simplify with the either monad
+withDefaultOutputInfo :: ((Base.PaDeviceIndex, Base.PaDeviceInfo) -> IO (Either Error a)) -> IO (Either Error a)
+withDefaultOutputInfo func = do
+    out <- getDefaultOut
+    case out of
+        Left err -> return $ Left err
+        Right val -> do
+            outInfo <- getDeviceInfo val
+            case outInfo of
+                Left err2 -> return $ Left err2
+                Right info -> func (val,info)
+
+withDefaultInputInfo :: ((Base.PaDeviceIndex, Base.PaDeviceInfo) -> IO (Either Error a)) -> IO (Either Error a)
+withDefaultInputInfo func = do
+    _in <- getDefaultIn
+    case _in of
+        Left err -> return $ Left err
+        Right val -> do
+            outInfo <- getDeviceInfo val
+            case outInfo of
+                Left err2 -> return $ Left err2
+                Right info -> func (val,info)
+
+getDeviceInfo :: Base.PaDeviceIndex -> IO (Either Error Base.PaDeviceInfo)
+getDeviceInfo x = do
+    devInfo <- Base.pa_GetDeviceInfo (Base.unPaDeviceIndex x)
+    if devInfo == nullPtr
+        then return (Left DeviceUnavailable)
+        else do
+            devStruct <- peek devInfo
+            return (Right devStruct)
+
+-- If we don't care about user data, just use this
+makeFinishedCallback :: IO () -> Base.PaStreamFinishedCallback
+makeFinishedCallback a = \_ -> a
+
 
 -- | Abort audio processing of the stream, stopping output as soon as possible.
 -- Output buffers that haven't already been committed.
