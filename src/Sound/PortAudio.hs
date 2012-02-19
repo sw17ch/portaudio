@@ -1,4 +1,4 @@
-{-# LANGUAGE ScopedTypeVariables #-}
+{-# LANGUAGE ScopedTypeVariables, MultiParamTypeClasses #-}
 module Sound.PortAudio
     ( Error(..), errorValuesByCode, errorCodesByValue
     , initialize, terminate, withPortAudio
