@@ -549,6 +549,11 @@ stopStream = fmap maybeError . Base.pa_StopStream . underlyingStream
 
 
 
+class Buffer a e where
+    fromForeignPtr :: ForeignPtr e -> Int -> Int -> IO (a e)
+    toForeignPtr   :: a e -> IO (ForeignPtr, Int, Int)
+
+
 -- Folks can implement things on top, but it is useful to have the most primitive interface.
 -- We assume the pointer has enough size!
 readStream :: Stream input output -> CULong -> ForeignPtr input -> IO (Maybe Error)
