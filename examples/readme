@@ -1,1 +1,9 @@
 Examples
+
+	1. demo.hs 			 -> Simple Initialization of Port Audio
+	2. paex_sine.hs 	 -> Play a Sine Wave with the Callback Interface
+	3. callbackPlayer.hs -> Play a wave or other music file with Callback Interface (requires libsndfile + hsndfile)
+	4. blockingPlayer.hs -> Play a wave or other music file with Blocking IO Interface (requires libsndfile + hsndfile)
+	5. recordWave.hs     -> Record input from Microphone to Wave File (requires libsndfile + hsndfile)
+	6. inOutWire.hs  	 -> Set up a wire between input and output
+	

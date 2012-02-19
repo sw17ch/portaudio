@@ -6,8 +6,7 @@ module Sound.PortAudio
     , StreamFormat, StreamOpenFlag(..)
     , StreamParameters(..)
     , Stream, openStream, withStream, openDefaultStream, withDefaultStream, abortStream, closeStream
-    , startStream, stopStream, withStreamRunning
-    , addStreamFin, withDefaultOutputInfo, withDefaultInputInfo, makeFinishedCallback ) where
+    , startStream, stopStream ) where
 
 import Control.Applicative ((<$>))
 import Control.Arrow (first, second, (|||))
@@ -25,7 +24,11 @@ import Foreign.C.Types (CDouble, CInt, CFloat, CULong)
 import Foreign.Marshal.Alloc (alloca)
 import Foreign.Ptr (Ptr, castPtr, nullFunPtr, nullPtr, freeHaskellFunPtr)
 import Foreign.Storable (Storable, peek, poke)
+import Foreign.ForeignPtr
+
 import qualified Sound.PortAudio.Base as Base
+
+import Data.Maybe
 
 data Error
     = NotInitialized
@@ -119,12 +122,20 @@ terminate :: IO (Maybe Error)
 terminate = maybeError <$> Base.pa_Terminate
 
 
+
+
+
+-- EXPORT
 -- | Evaluate a function with PortAudio initialized, terminating it after evaluation
 withPortAudio
     :: IO (Either Error a) -- ^ Computation to apply while PortAudio is initialized
     -> IO (Either Error a)
 withPortAudio f = go `finally` terminate
     where go = initialize >>= maybe f (return . Left)
+
+
+
+
 
 -- | Data type of flags passed in to a stream callback to indicate various conditions of the stream
 data StreamCallbackFlag
@@ -134,6 +145,9 @@ data StreamCallbackFlag
     | OutputOverflow   -- ^ Some of the output data will be discarded because the output cannot handle it
     | PrimingOutput    -- ^ Some or all of the output data will be used to prime the stream, and the input might be zero.
       deriving (Eq, Ord, Read, Show)
+
+
+
 
 -- | Turn a bitmask of callback flags as passed into a "raw" callback and give back a nice usable list of @StreamCallbackFlags@
 unpackCallbackFlags :: CInt -> [StreamCallbackFlag]
@@ -145,6 +159,8 @@ unpackCallbackFlags i = [flag | (value, flag) <- flagsAndValues, i .&. value == 
                            , (Base.paOutputOverflow, OutputOverflow)
                            , (Base.paPrimingOutput, PrimingOutput) ]
 
+
+
 -- | Data type of flags passed when opening a stream to set various parameters about the stream processing
 data StreamOpenFlag
     = ClipOff            -- ^ Don't clip of out of range samples
@@ -153,6 +169,7 @@ data StreamOpenFlag
                          -- Only valid with framesPerBuffer unspecified
     | PrimeOutputBuffers -- ^ Prime the output buffers by calling the callback first, rather than filling with zeroes
       deriving (Eq, Ord, Read, Show)
+
 
 -- | Turn a list of stream opening flags into a bitmask
 packOpenFlags :: [StreamOpenFlag] -> Base.PaStreamFlags
@@ -164,14 +181,9 @@ packOpenFlags = Base.PaStreamFlags . foldl' (\ bm f -> bm .|. Map.findWithDefaul
                      , (NeverDropInput, Base.paNeverDropInput)
                      , (PrimeOutputBuffers, Base.paPrimeOutputBuffersUsingStreamCallback) ]
 
--- | Type of callbacks that will be called with input samples that should provide output samples.
-type StreamCallback input output =
-      Base.PaStreamCallbackTimeInfo -- ^ Timing information for the input and output
-   -> [StreamCallbackFlag]          -- ^ Status flags
-   -> CULong                        -- ^ # of input samples
-   -> Ptr input                     -- ^ input samples
-   -> Ptr output                    -- ^ where to write output samples
-   -> IO StreamResult               -- ^ What to do with the stream, plus the output to stream
+
+
+
 
 
 -- | Result from stream callbacks that determines the action to take regarding the stream
@@ -199,6 +211,11 @@ instance StreamFormat Int32  where paSampleFormat _ = Base.paInt32
 instance StreamFormat CFloat where paSampleFormat _ = Base.paFloat32
 
 
+
+
+
+
+
 -- | A particular configuration of parameters for a stream
 data StreamParameters format 
     = StreamParameters
@@ -206,32 +223,70 @@ data StreamParameters format
       , spChannelCount     :: !CInt
       , spSuggestedLatency :: !Base.PaTime }        
 
--- | A PortAudio Stream
-data Stream
-    = Stream
-      { underlyingStream   :: !(Ptr Base.PaStream)
-      , underlyingCallback :: !Base.PaStreamCallbackFunPtr }
 
-instance Show Stream where
+-- | A PortAudio Stream
+data Stream a b
+    = Stream
+      { underlyingStream      :: !(Ptr Base.PaStream)
+      , underlyingCallback    :: !Base.PaStreamCallbackFunPtr
+      , underlyingFinCallback :: !Base.PaStreamFinishedCallbackFunPtr
+      , numInputChannels      :: Int
+      , numOutputChannels     :: Int
+      }
+
+instance Show (Stream a b) where
     show _ = "<Stream>"
 
+
+
+
+
+
+
+
+
+-- | Type of callbacks that will be called with input samples that should provide output samples.
+type StreamCallback input output =
+      Base.PaStreamCallbackTimeInfo -- ^ Timing information for the input and output
+   -> [StreamCallbackFlag]          -- ^ Status flags
+   -> CULong                        -- ^ # of input samples
+   -> Ptr input                     -- ^ input samples
+   -> Ptr output                    -- ^ where to write output samples
+   -> IO StreamResult               -- ^ What to do with the stream, plus the output to stream
+
+
 -- | Wrap a "cooked" callback into a raw one suitable for passing to the underlying library
-wrapCallback
-    :: (StreamFormat input, StreamFormat output) => 
-       StreamCallback input output
-    -> IO Base.PaStreamCallbackFunPtr
+wrapCallback :: (StreamFormat input, StreamFormat output) => StreamCallback input output -> IO Base.PaStreamCallbackFunPtr
 wrapCallback callback = 
     Base.wrap_PaStreamCallback $ \ input output frameCount ptrTimeInfo statusFlags _ ->
         peek ptrTimeInfo >>= \ timeInfo ->
         Base.unPaStreamCallbackResult . streamResultToPaStreamResult <$>
             callback timeInfo (unpackCallbackFlags statusFlags) frameCount (castPtr input) (castPtr output)
 
+
+type FinCallback = IO ()
+
+wrapFinCallback :: FinCallback -> IO Base.PaStreamFinishedCallbackFunPtr
+wrapFinCallback a = Base.wrap_PaStreamFinishedCallback (\_ -> a)
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 -- | Allocate space for convert the given "cooked" stream parameters into "raw" stream parameters, then evaluate
 -- the function over it
-withPtrPaStreamParameters
-    :: forall format a. (StreamFormat format) =>
-       Maybe (StreamParameters format)
-    -> (Ptr Base.PaStreamParameters -> IO a) -> IO a
+withPtrPaStreamParameters :: forall format a. (StreamFormat format) => Maybe (StreamParameters format) -> (Ptr Base.PaStreamParameters -> IO a) -> IO a
 withPtrPaStreamParameters Nothing   f = f nullPtr
 withPtrPaStreamParameters (Just sp) f =
     let params = Base.PaStreamParameters
@@ -242,112 +297,148 @@ withPtrPaStreamParameters (Just sp) f =
                       nullPtr
     in alloca $ \ ptr -> poke ptr params >> f ptr
 
+
+
+
 -- | Helper function which does the allocation and cleanup lifting for opening a stream.
-openStream_
-    :: (StreamFormat input, StreamFormat output) =>
-       Maybe (StreamCallback input output)
-    -> (Ptr (Ptr Base.PaStream) -> Base.PaStreamCallbackFunPtr -> IO CInt)
-    -> IO (Either Error Stream)
-openStream_ maybeCallback f =
-    alloca $ \ ptrPtrStream -> 
-        do wrappedCallback <- maybe (return nullFunPtr) wrapCallback maybeCallback
-           result <- maybeError <$> (f ptrPtrStream wrappedCallback)
-           case result of
-             Just err | isJust maybeCallback -> freeHaskellFunPtr wrappedCallback >> return (Left err)
-             Just err                        ->                                      return (Left err)
+openStream_ :: (StreamFormat input, StreamFormat output) =>
+               Maybe (StreamCallback input output)
+            -> (Ptr (Ptr Base.PaStream) -> Base.PaStreamCallbackFunPtr -> IO CInt)
+            -> (Ptr Base.PaStream -> Base.PaStreamCallbackFunPtr -> IO (Either Error (Stream input output)))
+            -> IO (Either Error (Stream input output))
+openStream_ maybeCallback f1 f2 = alloca $ \ ptrPtrStream -> 
+    do  wrappedCallback <- maybe (return nullFunPtr) wrapCallback maybeCallback
+        result <- maybeError <$> (f1 ptrPtrStream wrappedCallback)
+        case result of
+            Just err | isJust maybeCallback -> freeHaskellFunPtr wrappedCallback >> return (Left err)
+            Just err                        ->                                      return (Left err)
+            Nothing  -> peek ptrPtrStream >>= \ ptrStream -> f2 ptrStream wrappedCallback
 
-             Nothing  -> peek ptrPtrStream >>= \ ptrStream -> return (Right $! Stream ptrStream wrappedCallback)
-                                        
--- | Open a particular PortAudio stream using custom stream parameters. input and output are the type of sample
--- format requested
-openStream
-    :: (StreamFormat input, StreamFormat output) =>
-       Maybe (StreamParameters input)      -- ^ Input parameters
-    -> Maybe (StreamParameters output)     -- ^ Output parameters
-    -> CDouble                             -- ^ Sample rate
-    -> Maybe CULong                        -- ^ Frames per buffer
-    -> [StreamOpenFlag]                    -- ^ Stream flags
-    -> Maybe (StreamCallback input output) -- ^ Callback, or @Nothing@ for a blocking read/write stream
-    -> IO (Either Error Stream)
-openStream maybeInputParams maybeOutputParams sampleRate framesPerBuffer flags callback =
-    openStream_ callback $ \ ptrPtrStream wrappedCallback ->
-    withPtrPaStreamParameters maybeInputParams $ \ inputParams ->
-    withPtrPaStreamParameters maybeOutputParams $ \ outputParams ->
-        Base.pa_OpenStream 
-            ptrPtrStream
-            inputParams
-            outputParams
-            sampleRate
-            (maybe Base.paFramesPerBufferUnspecified fromIntegral framesPerBuffer)
-            (packOpenFlags flags)
-            wrappedCallback
-            nullPtr
 
--- | Open a stream as in @openStream@ then apply some computation to the opened stream, closing it automatically
--- afterwards
-withStream
-    :: (StreamFormat input, StreamFormat output) =>
-       Maybe (StreamParameters input)      -- ^ Input parameters
-    -> Maybe (StreamParameters output)     -- ^ Output parameters
-    -> CDouble                             -- ^ Sample rate
-    -> Maybe CULong                        -- ^ Frames per buffer
-    -> [StreamOpenFlag]                    -- ^ Stream flags
-    -> Maybe (StreamCallback input output) -- ^ Callback, or @Nothing@ for a blocking read/write stream
-    -> (Stream -> IO (Either Error a))     -- ^ Computation to apply
-    -> IO (Either Error a)
-withStream maybeInputParams maybeOutputParams sampleRate framesPerBuffer flags callback =
-    bracket open close . (return . Left |||)
-        where open = openStream maybeInputParams maybeOutputParams sampleRate framesPerBuffer flags callback
-              close = const (return Nothing) ||| closeStream
+
+
+
+openStream :: (StreamFormat input, StreamFormat output) =>
+                      Maybe (StreamParameters input)
+                   -> Maybe (StreamParameters output)
+                   -> Double
+                   -> Maybe Int
+                   -> [StreamOpenFlag]
+                   -> Maybe (StreamCallback input output)
+                   -> Maybe FinCallback
+                   -> IO (Either Error (Stream input output))
+openStream maybeInputParams maybeOutputParams sampleRate framesPerBuffer flags callback fin = let
+    func1 :: Ptr (Ptr Base.PaStream) -> Base.PaStreamCallbackFunPtr -> IO CInt
+    func1 ptrPtrStream wrappedCallback = do
+        withPtrPaStreamParameters maybeInputParams $ \inputParams ->
+            withPtrPaStreamParameters maybeOutputParams $ \outputParams ->
+                Base.pa_OpenStream
+                    ptrPtrStream
+                    inputParams
+                    outputParams
+                    (realToFrac sampleRate)
+                    (maybe Base.paFramesPerBufferUnspecified fromIntegral framesPerBuffer)
+                    (packOpenFlags flags)
+                    wrappedCallback
+                    nullPtr
+    
+    numInp = fromMaybe 0 (fromIntegral . spChannelCount <$> maybeInputParams)
+    numOut = fromMaybe 0 (fromIntegral . spChannelCount <$> maybeOutputParams)
+    
+    func2 :: Ptr Base.PaStream -> Base.PaStreamCallbackFunPtr -> IO (Either Error (Stream input output))
+    func2 ptrStream callback = case fin of
+        Nothing -> return . Right $ Stream ptrStream callback nullFunPtr numInp numOut 
+        Just func -> do
+            finWrapped <- wrapFinCallback func
+            result <- maybeError <$> Base.pa_SetStreamFinishedCallback ptrStream finWrapped
+            case result of
+                Just err -> freeHaskellFunPtr finWrapped >> return (Left err)
+                Nothing  -> return . Right $ Stream ptrStream callback finWrapped numInp numOut
+    
+    in openStream_ callback func1 func2
+    
+
+
 
 -- | Open the default PortAudio stream
-openDefaultStream
-    :: forall format. (StreamFormat format) =>
-       Int                                  -- ^ Number of input channels
-    -> Int                                  -- ^ Number of output channels
-    -> CDouble                              -- ^ Sample rate
-    -> Maybe CULong                         -- ^ Frames per buffer
-    -> Maybe (StreamCallback format format) -- ^ Callback, or @Nothing@ for a blocking read/write stream
-    -> IO (Either Error Stream)
-openDefaultStream numInputs numOutputs sampleRate framesPerBuffer callback =
-    openStream_ callback $ \ ptrPtrStream wrappedCallback -> 
+openDefaultStream :: forall format. (StreamFormat format) =>
+                     Int                        -- ^ Number of input channels
+                  -> Int                        -- ^ Number of output channels
+                  -> Double                     -- ^ Sample rate
+                  -> Maybe Int                  -- ^ Frames per buffer
+                  -> Maybe (StreamCallback format format) -- ^ Callback, or @Nothing@ for a blocking read/write stream
+                  -> Maybe FinCallback
+                  -> IO (Either Error (Stream format format))
+openDefaultStream numInputs numOutputs sampleRate framesPerBuffer callback fin = let
+    func1 :: Ptr (Ptr Base.PaStream) -> Base.PaStreamCallbackFunPtr -> IO CInt
+    func1 ptrPtrStream wrappedCallback = do
         Base.pa_OpenDefaultStream 
             ptrPtrStream
             (fromIntegral numInputs)
             (fromIntegral numOutputs)
             (paSampleFormat (undefined :: format))
-            sampleRate
-            (fromMaybe Base.paFramesPerBufferUnspecified framesPerBuffer)
+            (realToFrac sampleRate)
+            (fromMaybe Base.paFramesPerBufferUnspecified (fromIntegral <$> framesPerBuffer))
             wrappedCallback
             nullPtr
+    
+    func2 :: Ptr Base.PaStream -> Base.PaStreamCallbackFunPtr -> IO (Either Error (Stream format format))
+    func2 ptrStream callback = case fin of
+        Nothing -> return . Right $ Stream ptrStream callback nullFunPtr numInputs numOutputs
+        Just func -> do
+            finWrapped <- wrapFinCallback func
+            result <- maybeError <$> Base.pa_SetStreamFinishedCallback ptrStream finWrapped
+            case result of
+                Just err -> freeHaskellFunPtr finWrapped >> return (Left err)
+                Nothing  -> return . Right $ Stream ptrStream callback finWrapped numInputs numOutputs
+    
+    in openStream_ callback func1 func2
+
+
+
+
+
+-- | Open a stream as in @openStream@ then apply some computation to the opened stream, closing it automatically
+-- afterwards
+withStream :: (StreamFormat input, StreamFormat output) =>
+       Maybe (StreamParameters input)                   -- ^ Input parameters
+    -> Maybe (StreamParameters output)                  -- ^ Output parameters
+    -> Double                                           -- ^ Sample rate
+    -> Maybe Int                                        -- ^ Frames per buffer
+    -> [StreamOpenFlag]                                 -- ^ Stream flags
+    -> Maybe (StreamCallback input output)              -- ^ Callback, or @Nothing@ for a blocking read/write stream
+    -> Maybe FinCallback                                -- ^ Finished Callback or Nothing
+    -> (Stream input output -> IO (Either Error a))     -- ^ Computation to apply
+    -> IO (Either Error a)
+withStream maybeInputParams maybeOutputParams sampleRate framesPerBuffer flags callback fin =
+    bracket open close . (return . Left |||)
+        where open = openStream maybeInputParams maybeOutputParams sampleRate framesPerBuffer flags callback fin
+              close = const (return Nothing) ||| closeStream
 
 
 -- | Open a stream as in @openDefaultStream@ then apply some computation to the opened stream, closing it
 -- automatically afterwards
 withDefaultStream
     :: (StreamFormat format) =>
-       Int                                  -- ^ Number of input channels
-    -> Int                                  -- ^ Number of output channels
-    -> CDouble                              -- ^ Sample rate
-    -> Maybe CULong                         -- ^ Frames per buffer
-    -> Maybe (StreamCallback format format) -- ^ Callback, or @Nothing@ for a blocking read/write stream
-    -> (Stream -> IO (Either Error a))      -- ^ Computation to apply
-    -> IO (Either Error a)
-withDefaultStream numInputs numOutputs sampleRate framesPerBuffer callback =
+        Int                                  -- ^ Number of input channels
+     -> Int                                  -- ^ Number of output channels
+     -> Double                               -- ^ Sample rate
+     -> Maybe Int                            -- ^ Frames per buffer
+     -> Maybe (StreamCallback format format)  -- ^ Callback, or @Nothing@ for a blocking read/write stream
+     -> Maybe FinCallback
+     -> (Stream format format -> IO (Either Error a))      -- ^ Computation to apply
+     -> IO (Either Error a)
+withDefaultStream numInputs numOutputs sampleRate framesPerBuffer callback fin =
     bracket open close . (return . Left |||)
-        where open = openDefaultStream numInputs numOutputs sampleRate framesPerBuffer callback
+        where open = openDefaultStream numInputs numOutputs sampleRate framesPerBuffer callback fin
               close = const (return Nothing) ||| closeStream
 
 
 
--- Not sure if these can be replaced in place of the above with Methods.
--- I think they could still be useful for finer grained control. I'll try to 
--- write examples where we can't use the above methods in order to demonstrate.
 
-addStreamFin :: Base.PaStreamFinishedCallback -> Stream -> IO (Maybe Error)
-addStreamFin callback strm = do
-    wrapped <- Base.wrap_PaStreamFinishedCallback callback
-    maybeError <$> Base.pa_SetStreamFinishedCallback (underlyingStream strm) wrapped
+
+
+
 
 getDefaultOut :: IO (Either Error Base.PaDeviceIndex)
 getDefaultOut = do
@@ -359,9 +450,12 @@ getDefaultIn = do
     in_ <- Base.PaDeviceIndex <$> Base.pa_GetDefaultInputDevice
     return $ if in_ /= Base.paNoDevice then (Right in_) else (Left DeviceUnavailable)
 
---prolly can simplify with the either monad
-withDefaultOutputInfo :: ((Base.PaDeviceIndex, Base.PaDeviceInfo) -> IO (Either Error a)) -> IO (Either Error a)
-withDefaultOutputInfo func = do
+
+
+
+--Export
+getDefaultOutputInfo :: IO (Either Error (Base.PaDeviceIndex, Base.PaDeviceInfo))
+getDefaultOutputInfo = do
     out <- getDefaultOut
     case out of
         Left err -> return $ Left err
@@ -369,10 +463,10 @@ withDefaultOutputInfo func = do
             outInfo <- getDeviceInfo val
             case outInfo of
                 Left err2 -> return $ Left err2
-                Right info -> func (val,info)
+                Right info -> return $ Right (val,info)
 
-withDefaultInputInfo :: ((Base.PaDeviceIndex, Base.PaDeviceInfo) -> IO (Either Error a)) -> IO (Either Error a)
-withDefaultInputInfo func = do
+getDefaultInputInfo :: IO (Either Error (Base.PaDeviceIndex, Base.PaDeviceInfo))
+getDefaultInputInfo = do
     _in <- getDefaultIn
     case _in of
         Left err -> return $ Left err
@@ -380,7 +474,7 @@ withDefaultInputInfo func = do
             outInfo <- getDeviceInfo val
             case outInfo of
                 Left err2 -> return $ Left err2
-                Right info -> func (val,info)
+                Right info -> return $ Right (val, info)
 
 getDeviceInfo :: Base.PaDeviceIndex -> IO (Either Error Base.PaDeviceInfo)
 getDeviceInfo x = do
@@ -391,34 +485,96 @@ getDeviceInfo x = do
             devStruct <- peek devInfo
             return (Right devStruct)
 
--- If we don't care about user data, just use this
-makeFinishedCallback :: IO () -> Base.PaStreamFinishedCallback
-makeFinishedCallback a = \_ -> a
+getStreamInfo :: Stream input output -> IO (Either Error Base.PaStreamInfo)
+getStreamInfo strm = do
+    info <- Base.pa_GetStreamInfo (underlyingStream strm) 
+    if info == nullPtr
+        then return (Left BadStreamPtr)
+        else do
+            result <- peek info
+            return (Right result) 
+
+getStreamTime :: Stream input output -> IO (Either Error Base.PaTime)
+getStreamTime strm = do
+    val <- Base.pa_GetStreamTime (underlyingStream strm)
+    if (Base.unPaTime val == 0)
+        then return (Left BadStreamPtr)
+        else return (Right val)
+
+getNumDevices :: IO Int
+getNumDevices = fromIntegral <$> Base.pa_GetDeviceCount
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 -- | Abort audio processing of the stream, stopping output as soon as possible.
 -- Output buffers that haven't already been committed.
-abortStream  :: Stream -> IO (Maybe Error)
+abortStream  :: Stream a b -> IO (Maybe Error)
 abortStream = fmap maybeError . Base.pa_AbortStream . underlyingStream
 
 -- | Close a stream, releasing the resources held for it.
-closeStream :: Stream -> IO (Maybe Error)
+closeStream :: Stream a b -> IO (Maybe Error)
 closeStream s =
     do freeHaskellFunPtr $ underlyingCallback s
+       freeHaskellFunPtr $ underlyingFinCallback s
        maybeError <$> Base.pa_CloseStream (underlyingStream s)
 
 -- | Start audio processing on the stream.
 -- The callback will begin being called, if this is a callback style stream.
-startStream :: Stream -> IO (Maybe Error)
+startStream :: Stream a b -> IO (Maybe Error)
 startStream = fmap maybeError . Base.pa_StartStream . underlyingStream
 
 -- | Stop audio processing for the stream.
 -- Output buffers already provided will be completed before audio processing halts.
-stopStream :: Stream -> IO (Maybe Error)
+stopStream :: Stream a b -> IO (Maybe Error)
 stopStream = fmap maybeError . Base.pa_StopStream . underlyingStream
 
--- | Bracket a computation with starting and stopping the stream
-withStreamRunning :: Stream -> (Stream -> IO (Either Error a)) -> IO (Either Error a)
-withStreamRunning s = bracket start stop . (return . Left |||)
-    where start = maybe (Right s) Left <$> startStream s
-          stop = const (return Nothing) ||| stopStream
+
+
+-- Folks can implement things on top, but it is useful to have the most primitive interface.
+-- We assume the pointer has enough size!
+readStream :: Stream input output -> CULong -> ForeignPtr input -> IO (Maybe Error)
+readStream s frames pt = withForeignPtr pt $ \ptr -> do
+    maybeError <$> Base.pa_ReadStream (underlyingStream s) (castPtr ptr) frames
+
+
+-- We assume the pointer has enough size!
+writeStream :: Stream input output -> CULong -> ForeignPtr output -> IO (Maybe Error)
+writeStream s frames pt = withForeignPtr pt $ \ptr -> do
+    maybeError <$> Base.pa_WriteStream (underlyingStream s) (castPtr ptr) frames
+
+
+
+
+readAvailable :: Stream input output -> IO (Either Error Int)
+readAvailable strm = do
+    val <- Base.pa_GetStreamReadAvailable (underlyingStream strm) 
+    if (val < 0)
+        then return $ Left . fromJust $ maybeError (fromIntegral val)
+        else return $ Right (fromIntegral val)
+
+
+writeAvailable :: Stream input output -> IO (Either Error Int)
+writeAvailable strm = do
+    val <- Base.pa_GetStreamWriteAvailable (underlyingStream strm)
+    if (val < 0)
+        then return $ Left . fromJust $ maybeError (fromIntegral val)
+        else return $ Right (fromIntegral val)

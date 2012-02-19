@@ -1,9 +1,5 @@
 {-# LANGUAGE ScopedTypeVariables #-}
 
--- This is how you would play a song with libsnd and portaudio with Haskell using Callbacks.
--- Because Haskell is GC, it is not recommended you use callbacks, this is simply for demo purposes
--- You should use blocking IO instead! Also never test code on with headphones or speakers on loud volume!
-
 import qualified Sound.File.Sndfile as SF
 import qualified Sound.File.Sndfile.Buffer.Vector as VSF
 import qualified Data.Vector.Storable as V
@@ -18,16 +14,13 @@ import Sound.PortAudio
 import Control.Concurrent
 import Control.Applicative
 
-processingFunction :: Vector CFloat -> IO ()
-processingFunction vec = do
-    
-
 main :: IO ()
 main = do
     [inFile] <- getArgs
     (info, Just (x :: VSF.Buffer Float)) <- SF.readFile inFile
     
-    let vecData = VSF.fromBuffer x
+    let vecData = V.map (\i -> (realToFrac i) :: CFloat ) VSF.fromBuffer x
+    fileData <- newMVar vecData    
     putStrLn $ "sample rate: " ++ (show $ SF.samplerate info)
     putStrLn $ "channels: "    ++ (show $ SF.channels info)
     putStrLn $ "frames: "      ++ (show $ SF.frames info)
@@ -43,9 +36,10 @@ main = do
                 framesPerBuffer = 2000
 
 
-            withStream Nothing strmParams smpRate frmPerBuf [ClipOff] Nothing $ \strm -> do
+            withStream Nothing strmParams smpRate frmPerBuf [ClipOff, PrimeOutputBuffers] Nothing $ \strm -> do
+                s1 <- addStreamFin (makeFinishedCallback $ streamFinished "Finished Playing Song!") strm
                 s2 <- startStream strm
-                strm.
+                takeMVar songDone
                 s3 <- stopStream strm
                 return $ Right ()
 
