@@ -16,7 +16,8 @@ homepage: http://code.haskell.org/portaudio
 library
   hs-source-dirs: src
   exposed-modules: Sound.PortAudio,
-                   Sound.PortAudio.Base
+                   Sound.PortAudio.Base,
+                   Sound.PortAudio.Buffer
   ghc-options: -Wall
   build-depends: base > 4,
                  containers == 0.3.*

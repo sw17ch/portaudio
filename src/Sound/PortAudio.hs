@@ -1,12 +1,14 @@
 {-# LANGUAGE ScopedTypeVariables, MultiParamTypeClasses #-}
 module Sound.PortAudio
     ( Error(..), errorValuesByCode, errorCodesByValue
-    , initialize, terminate, withPortAudio
+    , initialize, terminate, withPortAudio, numInputChannels, numOutputChannels
     , StreamCallback, StreamResult(..)
     , StreamFormat, StreamOpenFlag(..)
-    , StreamParameters(..)
+    , StreamParameters(..), StreamCallbackFlag
     , Stream, openStream, withStream, openDefaultStream, withDefaultStream, abortStream, closeStream
-    , startStream, stopStream ) where
+    , getNumDevices, getStreamInfo, getDeviceInfo, getDefaultInputInfo, getDefaultOutputInfo
+    , getStreamTime, readAvailable, writeAvailable
+    , startStream, stopStream, readStream, writeStream ) where
 
 import Control.Applicative ((<$>))
 import Control.Arrow (first, second, (|||))
@@ -19,8 +21,7 @@ import qualified Data.IntMap as IntMap
 import Data.List (foldl')
 import Data.Map (Map)
 import qualified Data.Map as Map
-import Data.Maybe (fromJust, fromMaybe, isJust)
-import Foreign.C.Types (CDouble, CInt, CFloat, CULong)
+import Foreign.C.Types (CInt, CFloat, CULong)
 import Foreign.Marshal.Alloc (alloca)
 import Foreign.Ptr (Ptr, castPtr, nullFunPtr, nullPtr, freeHaskellFunPtr)
 import Foreign.Storable (Storable, peek, poke)
@@ -230,8 +231,8 @@ data Stream a b
       { underlyingStream      :: !(Ptr Base.PaStream)
       , underlyingCallback    :: !Base.PaStreamCallbackFunPtr
       , underlyingFinCallback :: !Base.PaStreamFinishedCallbackFunPtr
-      , numInputChannels      :: Int
-      , numOutputChannels     :: Int
+      , numInputChannels      :: CULong
+      , numOutputChannels     :: CULong
       }
 
 instance Show (Stream a b) where
@@ -346,14 +347,14 @@ openStream maybeInputParams maybeOutputParams sampleRate framesPerBuffer flags c
     numOut = fromMaybe 0 (fromIntegral . spChannelCount <$> maybeOutputParams)
     
     func2 :: Ptr Base.PaStream -> Base.PaStreamCallbackFunPtr -> IO (Either Error (Stream input output))
-    func2 ptrStream callback = case fin of
-        Nothing -> return . Right $ Stream ptrStream callback nullFunPtr numInp numOut 
+    func2 ptrStream cb = case fin of
+        Nothing -> return . Right $ Stream ptrStream cb nullFunPtr numInp numOut 
         Just func -> do
             finWrapped <- wrapFinCallback func
             result <- maybeError <$> Base.pa_SetStreamFinishedCallback ptrStream finWrapped
             case result of
                 Just err -> freeHaskellFunPtr finWrapped >> return (Left err)
-                Nothing  -> return . Right $ Stream ptrStream callback finWrapped numInp numOut
+                Nothing  -> return . Right $ Stream ptrStream cb finWrapped numInp numOut
     
     in openStream_ callback func1 func2
     
@@ -382,16 +383,19 @@ openDefaultStream numInputs numOutputs sampleRate framesPerBuffer callback fin =
             wrappedCallback
             nullPtr
     
+    inps = fromIntegral numInputs
+    outs = fromIntegral numOutputs
+    
     func2 :: Ptr Base.PaStream -> Base.PaStreamCallbackFunPtr -> IO (Either Error (Stream format format))
-    func2 ptrStream callback = case fin of
-        Nothing -> return . Right $ Stream ptrStream callback nullFunPtr numInputs numOutputs
+    func2 ptrStream cb = case fin of
+        Nothing -> return . Right $ Stream ptrStream cb nullFunPtr inps outs
         Just func -> do
             finWrapped <- wrapFinCallback func
             result <- maybeError <$> Base.pa_SetStreamFinishedCallback ptrStream finWrapped
             case result of
                 Just err -> freeHaskellFunPtr finWrapped >> return (Left err)
-                Nothing  -> return . Right $ Stream ptrStream callback finWrapped numInputs numOutputs
-    
+                Nothing  -> return . Right $ Stream ptrStream cb finWrapped inps outs
+                    
     in openStream_ callback func1 func2
 
 
@@ -453,7 +457,6 @@ getDefaultIn = do
 
 
 
---Export
 getDefaultOutputInfo :: IO (Either Error (Base.PaDeviceIndex, Base.PaDeviceInfo))
 getDefaultOutputInfo = do
     out <- getDefaultOut
@@ -547,11 +550,6 @@ startStream = fmap maybeError . Base.pa_StartStream . underlyingStream
 stopStream :: Stream a b -> IO (Maybe Error)
 stopStream = fmap maybeError . Base.pa_StopStream . underlyingStream
 
-
-
-class Buffer a e where
-    fromForeignPtr :: ForeignPtr e -> Int -> Int -> IO (a e)
-    toForeignPtr   :: a e -> IO (ForeignPtr, Int, Int)
 
 
 -- Folks can implement things on top, but it is useful to have the most primitive interface.

@@ -1,68 +1,46 @@
+{-# LANGUAGE MultiParamTypeClasses #-}
+
 module Sound.PortAudio.Buffer where
 
-import qualified Data.Vector as V
+import Sound.PortAudio
+import qualified Sound.PortAudio.Base as Base
+import Foreign.C.Types (CULong)
+import Foreign.ForeignPtr (ForeignPtr, newForeignPtr_)
 
--- We use these to convert from a User -> PortAudio type and Vice Versa
-class (Storable a, StreamFormat e) => Encodeable a e | a -> e where
-    toStream   :: a -> e
-    fromStream :: e -> a
+class Buffer a e where
+    fromForeignPtr :: ForeignPtr e -> Int -> Int -> IO (a e)
+    toForeignPtr   :: a e -> IO (ForeignPtr e, Int, Int)
 
-instance Encodeable Int8   Int8   where
-    toStream   = id
-    fromStream = id
-    
-instance Encodeable Int16  Int16  where
-    toStream   = id
-    fromStream = id
-    
-instance Encodeable Int32  Int32  where
-    toStream   = id
-    fromStream = id
-    
-instance Encodeable CFloat CFloat where
-    toStream   = id
-    fromStream = id
-    
-instance Encodeable Int    Int32  where
-    toStream   = fromIntegral
-    fromStream = fromIntegral
-    
-instance Encodeable Float  CFloat where
-    toStream   = realToFrac
-    fromStream = realToFrac
-    
-instance Encodeable Double CFloat where
-    toStream   = realToFrac
-    fromStream = realToFrac
+-- We need to associate stream info, since we need channel sizes
+type BuffStreamCallback input output a b =
+        Base.PaStreamCallbackTimeInfo
+    ->  [StreamCallbackFlag]
+    ->  CULong
+    ->  a input
+    ->  b output
+    ->  IO StreamResult
 
 
-
-
--- Code modified from hsndfile implementation
--- | Buffer class for I\/O on soundfile handles.
-class Encodeable e s => Buffer a e s | e -> s where
-    copyFromBuffer :: Ptr s -> Int -> IO (a e)
-    writeToBuffer  :: a e -> IO (ForeignPtr s, Int)
+-- In general if you have decided to use vectors underneath, you cannot freeze them, as that will
+-- mess things up since they are simply pointers underneath
+buffCBtoRawCB :: (StreamFormat input, StreamFormat output, Buffer a input, Buffer b output) =>
+    BuffStreamCallback input output a b -> Stream input output -> StreamCallback input output    
+buffCBtoRawCB func strm = \a b c d e -> do
+    fpA <- newForeignPtr_ d -- We will not free, as callback system will do that for us   
+    fpB <- newForeignPtr_ e -- We will not free, as callback system will do that for us
+    storeInp <- fromForeignPtr fpA 0 (fromIntegral $ numInputChannels strm * c)
+    storeOut <- fromForeignPtr fpB 0 (fromIntegral $ numOutputChannels strm * c)
+    func a b c storeInp storeOut
     
 
-instance Buffer ([] e s) where
-    copyFromBuffer ptr len = go [] len where
-        go !lst 0  = return $ lst 
-        go !lst !t = do
-            x <- fromStream <$> peekElemOff ptr t
-            go (x:lst) (t-1)
-        
-    writeToBuffer store = do
-        let len = length store
-        array <- mallocArray len
-        foldM_ (\i el -> pokeElemOff array i (toStream el) >> return (i + 1)) 0 len
-        return $ (newForeignPtr array, len)
-    
-    
-instance Buffer (Vector e s) where
-    copyFromBuffer ptr len =
-    writeToBuffer store ptr maxSize = 
-        
-instance Buffer ((Array Int) e s) where
-    copyFromBuffer ptr len = 
-    writeToBuffer store ptr maxSize = 
+-- We assume the Buffer is long enough!!!
+readBufferStream :: (Buffer a input, StreamFormat input, StreamFormat output) => Stream input output -> CULong -> a input -> IO (Maybe Error)
+readBufferStream a b c = do
+    (c', _, _) <- toForeignPtr c
+    readStream a b c'
+
+
+writeBufferStream :: (Buffer a output, StreamFormat input, StreamFormat output) => Stream input output -> CULong -> a output -> IO (Maybe Error)
+writeBufferStream a b c = do
+    (c', _, _) <- toForeignPtr c
+    writeStream a b c'
