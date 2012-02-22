@@ -1,19 +1,19 @@
 {-# LANGUAGE MultiParamTypeClasses, FlexibleInstances #-}
 
 -- This is the Buffer Typeclass instance for Storable Vectors
--- that are provided in the StorableVector Package: http://hackage.haskell.org/package/storablevector
+-- that are provided in the Vector Package: http://hackage.haskell.org/package/vector
 
 -- When using, it is critical that you do not Freeze and rethaw ever!
 -- We want modifications to be seen by the underlying Pointer Directly
 
-module Sound.PortAudio.Buffer.StorableVectorPackage (
+module Sound.PortAudio.Buffer.VectorPackage (
       Buffer
     , toBuffer
     , fromBuffer
     , withBuffer
 ) where
 
-import qualified Data.StorableVector.Base as SV
+import qualified Data.Vector.Storable as SV
 import qualified Sound.PortAudio.Buffer as PA
 import Foreign.Storable (Storable)
 
@@ -27,7 +27,8 @@ withBuffer :: (SV.Vector a -> SV.Vector b) -> Buffer a -> Buffer b
 withBuffer f = toBuffer . f . fromBuffer
 
 instance Storable a => PA.Buffer Buffer a where
-    fromForeignPtr p n   = return $ toBuffer $ SV.SV p 0 n
-    toForeignPtr x       = do
-        let (a, _, b) = SV.toForeignPtr $ fromBuffer x
-        return $ (a, b)
+    fromForeignPtr p n = do
+        let buff = SV.unsafeFromForeignPtr0 p n
+        return $ toBuffer buff
+        
+    toForeignPtr       = return . SV.unsafeToForeignPtr0 . fromBuffer

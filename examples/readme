@@ -1,9 +1,10 @@
 Examples
 
-	1. demo.hs 			 -> Simple Initialization of Port Audio
-	2. paex_sine.hs 	 -> Play a Sine Wave with the Callback Interface
-	3. callbackPlayer.hs -> Play a wave or other music file with Callback Interface (requires libsndfile + hsndfile)
-	4. blockingPlayer.hs -> Play a wave or other music file with Blocking IO Interface (requires libsndfile + hsndfile)
-	5. recordWave.hs     -> Record input from Microphone to Wave File (requires libsndfile + hsndfile)
-	6. inOutWire.hs  	 -> Set up a wire between input and output
+    There are two patterns to IO with PortAudio: Callbacks and BlockingIO. Both are Supported by the
+    Library and Relevant Examples are included. Certain more interesting examples require hsndfile
+    (audio encoding/decoding based on sndfile).
+
+    Although for the most part callbacks are the standard, they perform poorly if high quality streams
+    are required and therefore, we primarily recommend the blockingIO approach.
 	
+	1. Example1.hs   -> Play a Sine Wave
