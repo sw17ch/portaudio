@@ -115,17 +115,13 @@ withBlockingIO = do
         s3 <- stopStream strm
         return $ Right ()
 
-main :: IO ()
 main = do
     putStrLn $ "PortAudio Test: output sine wave. SR = " ++ (show sampRate) ++ ", BufSize = " ++ (show $ framesPerBuffer)
-    putStrLn $ "Run with Callback Default Settings, Callback Custom Settings, and Blocking Default Settings"
     
-    result <- withPortAudio $ do
-        withDefaults
-        withCustomSettings
-        withBlockingIO
-        return $ Right ()
+    -- Choose one of the Following,
+    -- For some reason I can combine withBlockingIO with withDefaults strange...
     
-    case result of
-        Left err -> print err
-        Right _  -> return ()
+    withPortAudio withBlockingIO
+    -- withPortAudio (withDefaults >> withCustomSettings)
+    
+    return ()
