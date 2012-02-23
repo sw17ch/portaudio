@@ -5,6 +5,9 @@ Examples
     (audio encoding/decoding based on sndfile).
 
     Although for the most part callbacks are the standard, they perform poorly if high quality streams
-    are required and therefore, we primarily recommend the blockingIO approach.
+    are required and therefore, we primarily recommend the blockingIO approach. The Sample wave file
+    included in this folder is from Austin Powers taken under an open license.
 	
 	1. Example1.hs   -> Play a Sine Wave
+	2. Example2.hs   -> Play a Wav File
+	
