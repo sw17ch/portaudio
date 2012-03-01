@@ -8,11 +8,13 @@ import Sound.PortAudio
 import qualified Sound.File.Sndfile as SF
 import qualified Sound.File.Sndfile.Buffer as BSF
 import qualified Sound.File.Sndfile.Buffer.Vector as VSF
+
+import Data.List (transpose)
 import qualified Data.Vector as V
 import qualified Data.Vector.Unboxed as U
 import qualified Data.Vector.Unboxed.Mutable as MV
 
-import Control.Monad (foldM, foldM_, forM_, when, unless)
+import Control.Monad (foldM, foldM_, forM_, when, unless, zipWithM_)
 import Control.Concurrent.MVar
 import Control.Concurrent.Chan
 import Control.Concurrent (threadDelay, forkIO)
@@ -36,7 +38,7 @@ data TimedBuffer = TimedBuffer {
 }
 
 framesPerBuffer :: Int
-framesPerBuffer = 100
+framesPerBuffer = 300
 
 type FFTPrintFunc = MVar [ Float ] -> IO ()
 
@@ -53,12 +55,25 @@ cursesRawPrintFunc mvar = CursesH.start >> workerFunc >> CursesH.end where
         dta <- takeMVar mvar
         unless (null dta) $ do
             (maxRows, maxCols) <- Curses.scrSize
+
+            let compressed = transpose $ take maxCols $ asciiDisplayRaw maxRows 5 (0, 25) (take maxCols dta) '*'
+
+                asciiDisplayRaw :: Int -> Int -> (Float, Float) -> [Float] -> Char -> [String]
+                asciiDisplayRaw height barWidth (x,y) points symbol = result where
+                    result = concatMap (\str -> replicate barWidth str) pure
+                    pure = map (\p -> let req = (func p) in (replicate (height - req) ' ') ++ (replicate req symbol)) points
+                    func pnt | pnt > y   = height
+                             | pnt < x   = 0
+                             | otherwise = ceiling $ (realToFrac height) * (pnt - x) / spanning
+
+                    spanning = y - x
+                    len = length points         
+                
+                displayBars :: Int -> [String] -> IO ()
+                displayBars width items = zipWithM_ (\row string -> Curses.move row 0 >> CursesH.drawLine width string) [0..] items
             
-            forM_ (zip [0..(maxRows - 1)] dta) $ \(i, pnt) -> do
-                let showed = ( show (i + 1) ) ++ " : " ++ show pnt
-                Curses.move i 0
-                CursesH.drawLine (min (maxCols - 1) (length showed)) showed
-                Curses.refresh
+            displayBars (maxCols - 1) compressed >> Curses.refresh
+
             workerFunc
             
 
@@ -134,13 +149,13 @@ withBlockingIO info fileData = do
 
 
 updateInterval :: Double
-updateInterval = 1
+updateInterval = 0.5
 
 pointsPerTransform :: Int
 pointsPerTransform = 1024            
 
 defaultPrintFunc :: FFTPrintFunc
-defaultPrintFunc = rawPrintFunc
+defaultPrintFunc = cursesRawPrintFunc
 
 main :: IO ()
 main = do
