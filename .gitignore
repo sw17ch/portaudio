@@ -1,2 +1,7 @@
 dist/
 .*.swp
+.virthualenv/*
+.gitignore
+.DS_Store
+*.hi
+*.o
