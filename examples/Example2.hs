@@ -24,8 +24,9 @@ import Foreign.Ptr
 import System.Environment (getArgs)
 
 
+
 framesPerBuffer :: Int
-framesPerBuffer = 100
+framesPerBuffer = 1024
 
 
 simpleCallback :: MVar (V.Vector Float) -> MVar () -> StreamCallback CFloat CFloat
