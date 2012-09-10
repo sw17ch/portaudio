@@ -1,15 +1,40 @@
 {-# LANGUAGE ScopedTypeVariables, MultiParamTypeClasses #-}
+
+-- | This is the primary entry point to the PortAudio Haskell Interface (http://www.portaudio.com/).
+-- This interface supports both blocking and callback based IO.
 module Sound.PortAudio
-    ( initialize, terminate, withPortAudio
-    , StreamCallback, StreamResult(..)
-    , StreamFormat, StreamOpenFlag(..)
-    , StreamParameters(..), StreamCallbackFlag
-    , Error(..)
-    , Stream, numInputChannels, numOutputChannels
-    , openStream, withStream, openDefaultStream, withDefaultStream, abortStream, closeStream
-    , getNumDevices, getStreamInfo, getDeviceInfo, getDefaultInputInfo, getDefaultOutputInfo
-    , getStreamTime, readAvailable, writeAvailable
-    , startStream, stopStream, readStream, writeStream ) where
+    (
+    -- *Port Audio Initialization
+      initialize, terminate, withPortAudio
+
+    -- *Stream Setup
+    -- | These methods can only be called once you have initialized PortAudio.
+    --  In most cases when starting a stream you should use @withDefaultStream@.
+    --  See the example code for simple use cases.
+    
+    -- | The type parameters on Stream must correspond to those in @StreamFormat@.
+    , Stream, StreamParameters(..)
+    , StreamFormat
+    , openStream, openDefaultStream, closeStream, abortStream
+    , withStream, withDefaultStream
+    , FinCallback
+    
+    -- **Reading and Writing from a Stream
+    , readAvailable, writeAvailable
+    , startStream, stopStream, readStream, writeStream
+
+    -- **Stream Utilities
+    , numInputChannels, numOutputChannels
+    , getNumDevices, getStreamInfo, getDeviceInfo, getDefaultInputInfo
+    , getDefaultOutputInfo
+    , getStreamTime 
+
+    -- *Port Audio Callback IO
+    -- **Types
+    , StreamCallback, StreamResult(..), StreamCallbackFlag(..)
+    -- *Error Codes and Flags
+    , StreamOpenFlag(..)
+    , Error(..)) where
 
 import Control.Applicative ((<$>))
 import Control.Arrow (first, second, (|||))
@@ -31,6 +56,7 @@ import Foreign.ForeignPtr (ForeignPtr, withForeignPtr)
 
 import qualified Sound.PortAudio.Base as Base
 
+-- | These are the various Error Codes that can be returned by PortAudio
 data Error
     = NotInitialized
     | UnanticipatedHostError
@@ -131,6 +157,17 @@ withPortAudio
 withPortAudio f = go `finally` terminate
     where go = initialize >>= maybe f (return . Left)
 
+
+
+-- | If you want to use the callback IO method in PortAudio, your callback function should have the following
+-- type signature. These are callbacks that will be called with input samples and should provide output samples.
+type StreamCallback input output =
+      Base.PaStreamCallbackTimeInfo -- ^ Timing information for the input and output
+   -> [StreamCallbackFlag]          -- ^ Status flags
+   -> CULong                        -- ^ # of input samples
+   -> Ptr input                     -- ^ input samples
+   -> Ptr output                    -- ^ where to write output samples
+   -> IO StreamResult               -- ^ What to do with the stream, plus the output to stream
 
 
 -- | Data type of flags passed in to a stream callback to indicate various conditions of the stream
@@ -237,17 +274,6 @@ data Stream a b
 
 instance Show (Stream a b) where
     show _ = "<Stream>"
-
-
--- | Type of callbacks that will be called with input samples that should provide output samples.
-type StreamCallback input output =
-      Base.PaStreamCallbackTimeInfo -- ^ Timing information for the input and output
-   -> [StreamCallbackFlag]          -- ^ Status flags
-   -> CULong                        -- ^ # of input samples
-   -> Ptr input                     -- ^ input samples
-   -> Ptr output                    -- ^ where to write output samples
-   -> IO StreamResult               -- ^ What to do with the stream, plus the output to stream
-
 
 -- | Wrap a "cooked" callback into a raw one suitable for passing to the underlying library
 wrapCallback :: (StreamFormat input, StreamFormat output) => StreamCallback input output -> IO Base.PaStreamCallbackFunPtr
@@ -513,12 +539,12 @@ closeStream s =
 
 -- | Start audio processing on the stream.
 -- The callback will begin being called, if this is a callback style stream.
-startStream :: Stream a b -> IO (Maybe Error)
+startStream :: Stream input output -> IO (Maybe Error)
 startStream = fmap maybeError . Base.pa_StartStream . underlyingStream
 
 -- | Stop audio processing for the stream.
 -- Output buffers already provided will be completed before audio processing halts.
-stopStream :: Stream a b -> IO (Maybe Error)
+stopStream :: Stream input output -> IO (Maybe Error)
 stopStream = fmap maybeError . Base.pa_StopStream . underlyingStream
 
 

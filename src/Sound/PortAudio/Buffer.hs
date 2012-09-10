@@ -32,7 +32,7 @@ type BuffStreamCallback input output a b =
 
 
 
--- | Wrap a "cooked" buffer callback into the generic stream callback type.
+-- | Wrap a buffer callback into the generic stream callback type.
 buffCBtoRawCB :: (StreamFormat input, StreamFormat output, Buffer a input, Buffer b output) =>
     BuffStreamCallback input output a b -> Stream input output -> StreamCallback input output    
 buffCBtoRawCB func strm = \a b c d e -> do

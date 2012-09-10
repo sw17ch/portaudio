@@ -1,5 +1,5 @@
 name: portaudio
-version: 0.2.1
+version: 0.2.3
 synopsis: Haskell bindings for the PortAudio library.
 description: Bindings to the cross platform PortAudio library. Version 0.0.1 excludes the callback model.
 category: Sound
@@ -12,6 +12,15 @@ cabal-version: >= 1.2.0
 build-type: Simple
 stability: experimental
 homepage: http://code.haskell.org/portaudio
+extra-source-files:
+  examples/Example1.hs
+  examples/Example2.hs
+  examples/Example3.hs
+  examples/readme
+  examples/SampleAudio.wav
+  examples/StorableVector.hs
+  examples/Transform.hs
+  examples/Vector.hs
 
 library
   hs-source-dirs: src
@@ -22,3 +31,4 @@ library
   build-depends:     base >= 3 && < 5
                    , containers
   extra-Libraries: portaudio
+
