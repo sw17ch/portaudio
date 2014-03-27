@@ -50,7 +50,7 @@ import Data.Maybe (fromMaybe, fromJust, isJust)
 import qualified Data.Map as Map
 import Foreign.C.Types (CInt, CFloat, CULong)
 import Foreign.Marshal.Alloc (alloca)
-import Foreign.Ptr (Ptr, castPtr, nullFunPtr, nullPtr, freeHaskellFunPtr)
+import Foreign.Ptr (Ptr, FunPtr, castPtr, nullFunPtr, nullPtr, freeHaskellFunPtr)
 import Foreign.Storable (Storable, peek, poke)
 import Foreign.ForeignPtr (ForeignPtr, withForeignPtr)
 
@@ -138,6 +138,10 @@ maybeError :: CInt -> Maybe Error
 maybeError i | i == Base.unPaErrorCode Base.paNoError = Nothing
              | otherwise                              = Just $ toEnum $ fromIntegral i
 
+-- | Safely frees a @FunPtr@
+safeFreeHaskellFunPtr :: FunPtr a -> IO ()
+safeFreeHaskellFunPtr ptr | ptr == nullFunPtr = return ()
+                          | otherwise         = freeHaskellFunPtr ptr
 
 -- | Initialize PortAudio. All calls to @initialize@ should be matched by a call to @terminate@, or
 -- use @withPortAudio@ to terminate automatically
@@ -533,9 +537,10 @@ abortStream = fmap maybeError . Base.pa_AbortStream . underlyingStream
 -- | Close a stream, releasing the resources held for it.
 closeStream :: Stream a b -> IO (Maybe Error)
 closeStream s =
-    do freeHaskellFunPtr $ underlyingCallback s
-       freeHaskellFunPtr $ underlyingFinCallback s
-       maybeError <$> Base.pa_CloseStream (underlyingStream s)
+    do closeResult <- Base.pa_CloseStream (underlyingStream s)
+       safeFreeHaskellFunPtr $ underlyingCallback s
+       safeFreeHaskellFunPtr $ underlyingFinCallback s
+       return $ maybeError closeResult
 
 -- | Start audio processing on the stream.
 -- The callback will begin being called, if this is a callback style stream.
