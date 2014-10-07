@@ -10,28 +10,28 @@ import Foreign.Storable
 
 {- Integral types. -}
 newtype PaErrorCode = PaErrorCode { unPaErrorCode :: CInt }
-    deriving (Eq, Show, Storable)
+    deriving (Eq, Show, Num, Enum, Storable)
 
 newtype PaDeviceIndex = PaDeviceIndex { unPaDeviceIndex :: CInt }
-    deriving (Eq, Show, Storable)
+    deriving (Eq, Show, Num, Enum, Storable)
 
 newtype PaHostApiIndex = PaHostApiIndex { unPaHostApiIndex :: CInt }
-    deriving (Eq, Show, Storable)
+    deriving (Eq, Show, Num, Enum, Storable)
 
 newtype PaHostApiTypeId = PaHostApiTypeId { unPaHostApiTypeId :: CInt }
-    deriving (Eq, Show, Storable)
+    deriving (Eq, Show, Num, Enum, Storable)
 
 newtype PaSampleFormat = PaSampleFormat { unPaSampleFormat :: CULong }
-    deriving (Eq, Show, Storable)
+    deriving (Eq, Show, Num, Enum, Storable)
 
 newtype PaStreamFlags = PaStreamFlags { unPaStreamFlags :: CULong }
-    deriving (Eq, Show, Storable)
+    deriving (Eq, Show, Num, Enum, Storable)
 
 newtype PaStreamCallbackFlags = PaStreamCallbackFlags { unPaStreamCallbackFlags :: CULong }
-    deriving (Eq, Show, Storable)
+    deriving (Eq, Show, Num, Enum, Storable)
 
 newtype PaStreamCallbackResult = PaStreamCallbackResult { unPaStreamCallbackResult :: CInt }
-    deriving (Eq, Show, Storable)
+    deriving (Eq, Show, Num, Enum, Storable)
 
 {- FunctionPtr Types -}
 type PaStreamCallback =
